@@ -67,7 +67,7 @@ vocab_size = 3863
 
 # -* model arguments *-
 # 模型迭代次数
-total_epochs = 3
+total_epochs = 60
 # 模型维度
 model_size = 320
 # 注意力机制头数
