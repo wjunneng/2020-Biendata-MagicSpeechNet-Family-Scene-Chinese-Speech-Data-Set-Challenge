@@ -5,7 +5,9 @@ import sys
 os.chdir(sys.path[0])
 
 # project_dir: .../2020-Biendata-MagicSpeechNet-Family-Scene-Chinese-Speech-Data-Set-Challenge
-project_dir = '/'.join(os.path.abspath('..').split('/')[:-1])
+# project_dir = '/'.join(os.path.abspath('..').split('/')[:-1])
+project_dir = '/home/wjunneng/Ubuntu/2020-Biendata-MagicSpeechNet-Family-Scene-Chinese-Speech-Data-Set-Challenge'
+
 # src dir: .../2020-Biendata-MagicSpeechNet-Family-Scene-Chinese-Speech-Data-Set-Challenge/src
 src_dir = os.path.join(project_dir, 'src')
 # 当前文件路径: .../2020-Biendata-MagicSpeechNet-Family-Scene-Chinese-Speech-Data-Set-Challenge/src/conf
