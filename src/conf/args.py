@@ -29,6 +29,8 @@ data_train_wav_dir = os.path.join(data_train_dir, 'wav')
 data_train_transcrpts_path = os.path.join(data_train_dir, 'trainscrpts.txt')
 # data train wav path
 data_train_wav_path = os.path.join(data_train_dir, 'wav.scp')
+# data train text
+data_train_text_path = os.path.join(data_train_dir, 'text.txt')
 
 # -* dev *-
 # data dev dir
@@ -39,6 +41,8 @@ data_dev_wav_dir = os.path.join(data_dev_dir, 'wav')
 data_dev_transcrpts_path = os.path.join(data_dev_dir, 'trainscrpts.txt')
 # data dev wav path
 data_dev_wav_path = os.path.join(data_dev_dir, 'wav.scp')
+# data dev text
+data_dev_text_path = os.path.join(data_dev_dir, 'text.txt')
 
 # -* test *-
 # data test dir
@@ -48,6 +52,39 @@ data_test_wav_dir = os.path.join(data_test_dir, 'wav')
 # data test wav path
 data_test_wav_path = os.path.join(data_test_dir, 'wav.scp')
 
+# -* model *-
+# data model dir
+data_model_dir = os.path.join(data_dir, 'model')
+
 vocab_path = os.path.join(data_dir, 'vocab.txt')
 vocab = {'<PAD>': 0, '<BOS>': 1, '<EOS>': 2, '<UNK>': 3}
-vocab_size = 3863   # 需要时刻注意是否更新
+# 需要时刻注意是否更新
+vocab_size = 3863
+
+# -* model arguments *-
+# 模型迭代次数
+total_epochs = 60
+# 模型维度
+model_size = 320
+# 注意力机制头数
+n_heads = 4
+# 编码器层数
+num_enc_blocks = 6
+# 解码器层数
+num_dec_blocks = 6
+# 残差连接丢弃率
+residual_dropout_rate = 0.1
+# 是否共享编码器词嵌入的权重
+share_embedding = True
+# 指定批大小
+batch_size = 16
+# 热身步数
+warmup_steps = 12000
+# 学习率因子
+lr_factor = 1.0
+# 梯度累计步数
+accu_grads_steps = 8
+# 输入特征维度
+input_size = 40
+
+unit2idx = {}

@@ -293,7 +293,7 @@ class AudioDataset(Dataset):
         self.targets_dict = None
 
         for wav_scp_file in wav_list:
-            with open(wav_scp_file, encoding='r', mode='utf-8') as file:
+            with open(wav_scp_file, mode='r', encoding='utf-8') as file:
                 for line in file:
                     uttid, path = line.strip().split()
                     self.file_list.append([uttid, path])
