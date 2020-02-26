@@ -47,3 +47,7 @@ data_test_dir = os.path.join(data_dir, 'test')
 data_test_wav_dir = os.path.join(data_test_dir, 'wav')
 # data test wav path
 data_test_wav_path = os.path.join(data_test_dir, 'wav.scp')
+
+vocab_path = os.path.join(data_dir, 'vocab.txt')
+vocab = {'<PAD>': 0, '<BOS>': 1, '<EOS>': 2, '<UNK>': 3}
+vocab_size = 3863   # 需要时刻注意是否更新

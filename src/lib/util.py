@@ -2,9 +2,14 @@
 import os
 import sys
 import json
+import copy
+import string
+import torch
+import numpy as np
+import torchaudio as ta
 
 from zhon import hanzi
-import string
+from torch.utils.data import Dataset
 from src.conf import args
 
 os.chdir(sys.path[0])
@@ -193,7 +198,148 @@ class Util(object):
             print('Normlize %s TEXT!' % name)
 
 
+class DataUtil(object):
+    def __init__(self):
+        pass
+
+    # 词表生成
+    def generate_vocab_table(self):
+        """
+        根据训练集文本生成词表，并加入起始标记<BOS>,结束标记<EOS>,填充标记<PAD>,以及未识别词标记<UNK>
+
+        :return: 返回模型词表大小
+        """
+        vocab_dict = {}
+        for name in ['train', 'dev']:
+            with open(os.path.join(args.data_dir, name, 'text.txt'), mode='r', encoding='utf-8') as file:
+                for line in file.readlines():
+                    chars = line.strip().split()[1:]
+                    for char in chars:
+                        if char not in vocab_dict:
+                            vocab_dict[char] = 1
+                        else:
+                            vocab_dict[char] += 1
+
+        vocab_list = sorted(vocab_dict.items(), key=lambda x: x[1], reverse=True)
+        vocab = copy.deepcopy(args.vocab)
+        for index, item in enumerate(vocab_list):
+            vocab[item[0]] = index + 4
+
+        print('There are {} units in Vocabulary!'.format(len(vocab)))
+
+        with open(args.vocab_path, mode='w', encoding='utf-8') as file:
+            for key, value in vocab.items():
+                file.write(key + ' ' + str(value) + '\n')
+
+        return len(vocab)
+
+    @staticmethod
+    def collate_fn(self, batch):
+        """
+        收集函数，将同一批内的特征填充到相同的长度，并在文本中加上起始和结束标记
+        :param self:
+        :param batch:
+        :return:
+        """
+        uttids = [data[0] for data in batch]
+        features_length = [data[1].shape[0] for data in batch]
+        max_features_length = max(features_length)
+        padded_features = []
+
+        use_targets = False
+        if len(batch[0]) == 3:
+            use_targets = True
+
+        if use_targets:
+            targets_length = [data[2] for data in batch]
+            max_targets_length = max(targets_length)
+            padded_targets = []
+
+        for parts in batch:
+            feature = parts[1]
+            feature_length = feature.shape[0]
+            padded_features.append(np.pad(feature, ((0, max_features_length - feature_length), (0, 0)), mode='constant',
+                                          constant_values=0.0))
+
+            if use_targets:
+                target = parts[2]
+                target_length = len(target)
+                padded_targets.append([self.vocab['<BOS>']] + target + self.vocab['<EOS>'] + self.vocab['<PAD>'] * (
+                        max_targets_length - target_length))
+
+        if use_targets:
+            return uttids, torch.FloatTensor(padded_features), torch.LongTensor(targets_length)
+        else:
+            return uttids, torch.FloatTensor(padded_features)
+
+
+class AudioDataset(Dataset):
+    def __init__(self, wav_list, text_list=None, unit2idx=None):
+        self.unit2idx = unit2idx
+        self.file_list = []
+        self.targets_dict = None
+
+        for wav_scp_file in wav_list:
+            with open(wav_scp_file, encoding='r', mode='utf-8') as file:
+                for line in file:
+                    uttid, path = line.strip().split()
+                    self.file_list.append([uttid, path])
+
+        if text_list is not None:
+            self.targets_dict = {}
+            for textfile in text_list:
+                with open(file=textfile, encoding='utf-8', mode='r') as file:
+                    for line in file.readlines():
+                        parts = line.strip().split()
+                        uttid = parts[0]
+                        label = []
+
+                        for c in parts[1:]:
+                            label.append([self.unit2idx[c] if c in self.unit2idx else self.unit2idx['<UNK>']])
+
+                        self.targets_dict[uttid] = label
+            # 过滤掉没有标注的句子
+            self.file_list = self.filter(self.file_list)
+            assert len(self.file_list) == len(self.targets_dict)
+
+    def filter(self, file_list):
+        """
+        根据uttid过滤
+        :param file_list:
+        :return:
+        """
+        new_list = []
+        for (uttid, path) in file_list:
+            if uttid not in self.targets_dict:
+                continue
+            else:
+                new_list.append([uttid, path])
+
+        return new_list
+
+    def __getitem__(self, item):
+        uttid, path = self.file_list[item]
+        wavform, _ = ta.load_wav(path)
+        # 计算fbank特征
+        feature = ta.compliance.kaldi.fbank(waveform=wavform, num_mel_bins=40)
+        # 特征归一化
+        feature = (feature - torch.mean(feature)) / torch.std(feature)
+
+        if self.targets_dict is not None:
+            return uttid, feature, self.targets_dict[uttid]
+        else:
+            return uttid, feature
+
+    def __len__(self):
+        return len(self.file_list)
+
+    @property
+    def idx2char(self):
+        return {i: c for (c, i) in self.unit2idx.items()}
+
+
 if __name__ == '__main__':
+    pass
     # 处理训练集和验证集
     # Util.deal_train_dev()
 
@@ -201,4 +347,7 @@ if __name__ == '__main__':
     # Util.deal_test()
 
     # 标准化训练和验证集
-    Util.normal_train_dev()
+    # Util.normal_train_dev()
+
+    # 词表生成
+    # DataUtil().generate_vocab_table()
