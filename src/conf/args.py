@@ -77,11 +77,11 @@ num_enc_blocks = 6
 # 解码器层数
 num_dec_blocks = 6
 # 残差连接丢弃率
-residual_dropout_rate = 0.1
+residual_dropout_rate = 0.5
 # 是否共享编码器词嵌入的权重
 share_embedding = True
 # 指定批大小 [batch:16->Global Step:1280]
-batch_size = 16
+batch_size = 24
 # 热身步数
 warmup_steps = 12000
 # 学习率因子
@@ -90,5 +90,3 @@ lr_factor = 1.0
 accu_grads_steps = 8
 # 输入特征维度
 input_size = 40
-
-unit2idx = {}

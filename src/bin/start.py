@@ -1,12 +1,13 @@
 # -*- coding:utf-8 -*-
 import os
 import sys
+import time
 
 os.chdir(sys.path[0])
 
 import torch
 from torch.utils.data import DataLoader
-from src.lib.util import AudioDataset, DataUtil
+from src.lib.util import AudioDataset, DataUtil, Util
 from src.conf import args
 from src.core.module import Transformer, Recognizer
 
@@ -16,17 +17,16 @@ class Run(object):
         self.args = args
         # 模型定义
         self.model = Transformer(input_size=self.args.input_size,
-                            vocab_size=self.args.vocab_size,
-                            d_model=self.args.model_size,
-                            n_heads=self.args.n_heads,
-                            d_ff=self.args.model_size * 4,
-                            num_enc_blocks=self.args.num_enc_blocks,
-                            num_dec_blocks=self.args.num_dec_blocks,
-                            residual_dropout_rate=self.args.residual_dropout_rate,
-                            share_embedding=self.args.share_embedding)
+                                 vocab_size=self.args.vocab_size,
+                                 d_model=self.args.model_size,
+                                 n_heads=self.args.n_heads,
+                                 d_ff=self.args.model_size * 4,
+                                 num_enc_blocks=self.args.num_enc_blocks,
+                                 num_dec_blocks=self.args.num_dec_blocks,
+                                 residual_dropout_rate=self.args.residual_dropout_rate,
+                                 share_embedding=self.args.share_embedding)
         if torch.cuda.is_available():
             self.model.cuda()  # 将模型加载到GPU中
-
 
     def train(self):
         # unit2idx
@@ -47,12 +47,7 @@ class Run(object):
         dataloader = DataLoader(dataset, batch_size=self.args.batch_size, shuffle=True, num_workers=2, pin_memory=False,
                                 collate_fn=DataUtil.collate_fn)
 
-        # 定义优化器以及学习率更新函数
-        def get_learning_rate(step):
-            return self.args.lr_factor * self.args.model_size ** (-0.5) * min(step ** (-0.5),
-                                                                              step * self.args.warmup_steps ** (-1.5))
-
-        lr = get_learning_rate(step=1)
+        lr = Util.get_learning_rate(step=1)
         optimizer = torch.optim.Adam(self.model.parameters(), lr=lr, betas=(0.9, 0.98), eps=1e-9)
 
         if not os.path.exists(self.args.data_model_dir):
@@ -86,7 +81,7 @@ class Run(object):
                     step_loss = 0
 
                     # 学习率更新
-                    lr = get_learning_rate(global_step)
+                    lr = Util.get_learning_rate(global_step)
                     for param_group in optimizer.param_groups:
                         param_group['lr'] = lr
 
@@ -123,10 +118,10 @@ class Run(object):
                                                       pin_memory=False, collate_fn=DataUtil.collate_fn)
 
         # checkpoints = torch.load('./model/model.pt', map_location=lambda storage, loc: storage)
-        checkpoints = torch.load(os.path.join(self.args.data_model_dir, 'model.epoch.0.pt'))
-        self.model.load_state_dict(checkpoints)
+        checkpoints = torch.load(os.path.join(self.args.data_model_dir, 'model.epoch.2.pt'))
+        eval_model.load_state_dict(checkpoints)
 
-        recognizer = Recognizer(self.model, unit2char=idx2unit)
+        recognizer = Recognizer(eval_model, unit2char=idx2unit)
 
         csv_writer = open(self.args.data_reault_path, 'w', encoding='utf-8')
         csv_writer.write('id,words\n')
@@ -145,5 +140,9 @@ class Run(object):
 
 
 if __name__ == '__main__':
+    start = time.clock()
     # Run().train()
+    current_time = time.clock()
+    print('train using time: {}'.format(current_time - start))
     Run().predict()
+    print('predict using time: {}'.format(time.clock() - current_time))

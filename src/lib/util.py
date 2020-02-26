@@ -210,6 +210,11 @@ class Util(object):
 
         return seq_mask
 
+    @staticmethod
+    # 定义优化器以及学习率更新函数
+    def get_learning_rate(step):
+        return args.lr_factor * args.model_size ** (-0.5) * min(step ** (-0.5), step * args.warmup_steps ** (-1.5))
+
 
 class DataUtil(object):
     def __init__(self):
