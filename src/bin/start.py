@@ -42,8 +42,6 @@ class Run(object):
             model.cuda()  # 将模型加载到GPU中
 
         # 将模型加载
-        unit2idx = {}
-
         train_wav_list = [self.args.data_train_wav_path, self.args.data_dev_wav_path]
         train_text_list = [self.args.data_train_text_path, self.args.data_dev_wav_path]
         dataset = AudioDataset(train_wav_list, train_text_list, unit2idx=unit2idx)

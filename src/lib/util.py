@@ -247,104 +247,96 @@ class DataUtil(object):
         return len(vocab)
 
     @staticmethod
-    def collate_fn(self, batch):
+    def collate_fn(batch):
         """
         收集函数，将同一批内的特征填充到相同的长度，并在文本中加上起始和结束标记
-        :param self:
         :param batch:
         :return:
         """
         uttids = [data[0] for data in batch]
         features_length = [data[1].shape[0] for data in batch]
-        max_features_length = max(features_length)
+        max_feat_length = max(features_length)
         padded_features = []
 
-        use_targets = False
         if len(batch[0]) == 3:
-            use_targets = True
-
-        if use_targets:
-            targets_length = [data[2] for data in batch]
-            max_targets_length = max(targets_length)
+            targets_length = [len(data[2]) for data in batch]
+            max_text_length = max(targets_length)
             padded_targets = []
 
         for parts in batch:
-            feature = parts[1]
-            feature_length = feature.shape[0]
-            padded_features.append(np.pad(feature, ((0, max_features_length - feature_length), (0, 0)), mode='constant',
+            feat = parts[1]
+            feat_len = feat.shape[0]
+            padded_features.append(np.pad(feat, ((
+                                                     0, max_feat_length - feat_len), (0, 0)), mode='constant',
                                           constant_values=0.0))
 
-            if use_targets:
+            if len(batch[0]) == 3:
                 target = parts[2]
-                target_length = len(target)
-                padded_targets.append([self.vocab['<BOS>']] + target + self.vocab['<EOS>'] + self.vocab['<PAD>'] * (
-                        max_targets_length - target_length))
+                text_len = len(target)
+                padded_targets.append(
+                    [args.vocab['<BOS>']] + target + [args.vocab['<EOS>']] + [args.vocab['<PAD>']] * (
+                            max_text_length - text_len))
 
-        if use_targets:
-            return uttids, torch.FloatTensor(padded_features), torch.LongTensor(targets_length)
+        if len(batch[0]) == 3:
+            return uttids, torch.FloatTensor(padded_features), torch.LongTensor(padded_targets)
         else:
             return uttids, torch.FloatTensor(padded_features)
 
 
 class AudioDataset(Dataset):
     def __init__(self, wav_list, text_list=None, unit2idx=None):
-        self.unit2idx = unit2idx
-        self.file_list = []
-        self.targets_dict = None
 
-        for wav_scp_file in wav_list:
-            with open(wav_scp_file, mode='r', encoding='utf-8') as file:
-                for line in file:
+        self.unit2idx = unit2idx
+
+        self.file_list = []
+        for wavscpfile in wav_list:
+            with open(wavscpfile, 'r', encoding='utf-8') as wr:
+                for line in wr:
                     uttid, path = line.strip().split()
                     self.file_list.append([uttid, path])
 
         if text_list is not None:
             self.targets_dict = {}
             for textfile in text_list:
-                with open(file=textfile, encoding='utf-8', mode='r') as file:
-                    for line in file.readlines():
+                with open(textfile, 'r', encoding='utf-8') as tr:
+                    for line in tr:
                         parts = line.strip().split()
                         uttid = parts[0]
                         label = []
-
                         for c in parts[1:]:
-                            label.append([self.unit2idx[c] if c in self.unit2idx else self.unit2idx['<UNK>']])
-
+                            label.append(self.unit2idx[c] if c in self.unit2idx else self.unit2idx['<UNK>'])
                         self.targets_dict[uttid] = label
-            # 过滤掉没有标注的句子
-            self.file_list = self.filter(self.file_list)
+            self.file_list = self.filter(self.file_list)  # 过滤掉没有标注的句子
             assert len(self.file_list) == len(self.targets_dict)
+        else:
+            self.targets_dict = None
 
-    def filter(self, file_list):
-        """
-        根据uttid过滤
-        :param file_list:
-        :return:
-        """
-        new_list = []
-        for (uttid, path) in file_list:
-            if uttid not in self.targets_dict:
-                continue
-            else:
-                new_list.append([uttid, path])
+        self.lengths = len(self.file_list)
 
-        return new_list
-
-    def __getitem__(self, item):
-        uttid, path = self.file_list[item]
-        wavform, _ = ta.load_wav(path)
-        # 计算fbank特征
-        feature = ta.compliance.kaldi.fbank(waveform=wavform, num_mel_bins=40)
+    def __getitem__(self, index):
+        uttid, path = self.file_list[index]
+        wavform, _ = ta.load_wav(path)  # 加载wav文件
+        feature = ta.compliance.kaldi.fbank(wavform, num_mel_bins=40)  # 计算fbank特征
         # 特征归一化
-        feature = (feature - torch.mean(feature)) / torch.std(feature)
+        mean = torch.mean(feature)
+        std = torch.std(feature)
+        feature = (feature - mean) / std
 
         if self.targets_dict is not None:
-            return uttid, feature, self.targets_dict[uttid]
+            targets = self.targets_dict[uttid]
+            return uttid, feature, targets
         else:
             return uttid, feature
 
+    def filter(self, feat_list):
+        new_list = []
+        for (uttid, path) in feat_list:
+            if uttid not in self.targets_dict: continue
+            new_list.append([uttid, path])
+        return new_list
+
     def __len__(self):
-        return len(self.file_list)
+        return self.lengths
 
     @property
     def idx2char(self):

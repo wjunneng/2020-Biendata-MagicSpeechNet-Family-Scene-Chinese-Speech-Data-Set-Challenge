@@ -15,8 +15,7 @@ from src.lib.util import Util
 
 # 多头注意力机制
 class MultiHeadedAttention(nn.Module):
-    """
-    Multi-Head Attention layer
+    """Multi-Head Attention layer
 
     :param int n_head: the number of head s
     :param int n_feat: the number of features
@@ -26,22 +25,19 @@ class MultiHeadedAttention(nn.Module):
     def __init__(self, n_head, n_feat, dropout_rate=0.0):
         super(MultiHeadedAttention, self).__init__()
         assert n_feat % n_head == 0
-
-        # 假定d_k == d_v
+        # We assume d_v always equals d_k
         self.d_k = n_feat // n_head
-        self.n_head = n_head
-
+        self.h = n_head
         self.linear_q = nn.Linear(n_feat, n_feat)
         self.linear_k = nn.Linear(n_feat, n_feat)
         self.linear_v = nn.Linear(n_feat, n_feat)
-        self.linear_o = nn.Linear(n_feat, n_feat)
-
-        self.atten = None
-        self.dropout = nn.Dropout(dropout_rate)
+        self.linear_out = nn.Linear(n_feat, n_feat)
+        self.attn = None
+        self.dropout = nn.Dropout(p=dropout_rate)
 
     def forward(self, query, key, value, mask):
-        """
-        Compute 'Scaled Dot Product Attention'
+        """Compute 'Scaled Dot Product Attention'
+
         :param torch.Tensor query: (batch, time1, size)
         :param torch.Tensor key: (batch, time2, size)
         :param torch.Tensor value: (batch, time2, size)
@@ -49,52 +45,34 @@ class MultiHeadedAttention(nn.Module):
         :param torch.nn.Dropout dropout:
         :return torch.Tensor: attentined and transformed `value` (batch, time1, d_model)
              weighted by the query dot key attention (batch, head, time1, time2)
-
-        :param query:
-        :param key:
-        :param value:
-        :param mask:
-        :return:
         """
         n_batch = query.size(0)
-        q = self.linear_q(query).view(n_batch, -1, self.n_head, self.d_k)
-        k = self.linear_k(key).view(n_batch, -1, self.n_head, self.d_k)
-        v = self.linear_v(key).view(n_batch, -1, self.n_head, self.d_k)
+        q = self.linear_q(query).view(n_batch, -1, self.h, self.d_k)
+        k = self.linear_k(key).view(n_batch, -1, self.h, self.d_k)
+        v = self.linear_v(value).view(n_batch, -1, self.h, self.d_k)
+        q = q.transpose(1, 2)  # (batch, head, time1, d_k)
+        k = k.transpose(1, 2)  # (batch, head, time2, d_k)
+        v = v.transpose(1, 2)  # (batch, head, time2, d_k)
 
-        # 维度转换 (batch, head, time1, d_k)
-        q = q.transpose(1, 2)
-        # 维度转换 (batch, head, time2, d_k)
-        k = k.transpose(1, 2)
-        # 维度转换 (batch, head, time2, d_k)
-        v = v.transpose(1, 2)
-
-        # (batch, head, time1, time2)
-        scores = torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(self.d_k)
+        scores = torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(self.d_k)  # (batch, head, time1, time2)
         if mask is not None:
-            # (batch, 1, time1, time2)
-            mask = mask.unsqueeze(1).eq(0)
+            mask = mask.unsqueeze(1).eq(0)  # (batch, 1, time1, time2)
             min_value = float(np.finfo(torch.tensor(0, dtype=scores.dtype).numpy().dtype).min)
             scores = scores.masked_fill(mask, min_value)
-            # (batch, head, time1, time2)
-            self.atten = torch.softmax(scores, dim=-1).masked_fill(mask=mask, value=0.0)
+            self.attn = torch.softmax(scores, dim=-1).masked_fill(mask, 0.0)  # (batch, head, time1, time2)
         else:
-            # # (batch, head, time1, time2)
-            self.atten = torch.softmax(scores, dim=-1)
+            self.attn = torch.softmax(scores, dim=-1)  # (batch, head, time1, time2)
 
-        p_attn = self.dropout(self.atten)
-        # (batch, head, time1, d_k)
-        x = torch.matmul(p_attn, v)
-        # (batch, time1, d_model)
-        x = x.transpose(1, 2).contiguous().view(n_batch, -1, self.n_feat)
+        p_attn = self.dropout(self.attn)
+        x = torch.matmul(p_attn, v)  # (batch, head, time1, d_k)
+        x = x.transpose(1, 2).contiguous().view(n_batch, -1, self.h * self.d_k)  # (batch, time1, d_model)
 
-        # (batch, time1, d_model)
-        return self.linear_o(x)
+        return self.linear_out(x)  # (batch, time1, d_model)
 
 
-# 前馈网络
+# 前馈模块
 class PositionwiseFeedForward(nn.Module):
-    """
-    Positionwise feed forward
+    """Positionwise feed forward
 
     :param int idim: input dimenstion
     :param int hidden_units: number of hidden units
@@ -103,25 +81,29 @@ class PositionwiseFeedForward(nn.Module):
 
     def __init__(self, idim, hidden_units, dropout_rate=0.0):
         super(PositionwiseFeedForward, self).__init__()
-        self.w1 = nn.Linear(idim, hidden_units * 2)
-        self.w2 = nn.Linear(hidden_units, idim)
+        self.w_1 = nn.Linear(idim, hidden_units * 2)
+        self.w_2 = nn.Linear(hidden_units, idim)
         self.dropout = nn.Dropout(dropout_rate)
 
     def forward(self, x):
-        x = self.w1(x)
-        x = F.gelu(x)
-        x = self.dropout(x)
+        x = self.w_1(x)
+        x = F.glu(x)
 
-        return self.w2(x)
+        return self.w_2(self.dropout(x))
 
 
 # 位置编码
 class PositionalEncoding(nn.Module):
-    """
-    Positional Encoding
-    """
+    """Positional encoding."""
 
     def __init__(self, d_model, dropout_rate=0.0, max_len=5000):
+        """Initialize class.
+
+        :param int d_model: embedding dim
+        :param float dropout_rate: dropout rate
+        :param int max_len: maximum input length
+
+        """
         super(PositionalEncoding, self).__init__()
         self.d_model = d_model
         self.xscale = math.sqrt(self.d_model)
@@ -130,9 +112,7 @@ class PositionalEncoding(nn.Module):
         self.extend_pe(torch.tensor(0.0).expand(1, max_len))
 
     def extend_pe(self, x):
-        """
-        Reset the positional encodings.
-        """
+        """Reset the positional encodings."""
         if self.pe is not None:
             if self.pe.size(1) >= x.size(1):
                 if self.pe.dtype != x.dtype or self.pe.device != x.device:
@@ -148,8 +128,7 @@ class PositionalEncoding(nn.Module):
         self.pe = pe.to(device=x.device, dtype=x.dtype)
 
     def forward(self, x: torch.Tensor):
-        """
-        Add positional encoding.
+        """Add positional encoding.
 
         Args:
             x (torch.Tensor): Input. Its shape is (batch, time, ...)
@@ -160,7 +139,6 @@ class PositionalEncoding(nn.Module):
         """
         self.extend_pe(x)
         x = x * self.xscale + self.pe[:, :x.size(1)]
-
         return self.dropout(x)
 
 
