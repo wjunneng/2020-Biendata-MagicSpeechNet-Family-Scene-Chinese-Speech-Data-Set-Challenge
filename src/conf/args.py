@@ -56,6 +56,10 @@ data_test_wav_path = os.path.join(data_test_dir, 'wav.scp')
 # data model dir
 data_model_dir = os.path.join(data_dir, 'model')
 
+# -* result *-
+# data result path
+data_reault_path = os.path.join(data_dir, 'result.csv')
+
 vocab_path = os.path.join(data_dir, 'vocab.txt')
 vocab = {'<PAD>': 0, '<BOS>': 1, '<EOS>': 2, '<UNK>': 3}
 # 需要时刻注意是否更新
@@ -63,7 +67,7 @@ vocab_size = 3863
 
 # -* model arguments *-
 # 模型迭代次数
-total_epochs = 60
+total_epochs = 3
 # 模型维度
 model_size = 320
 # 注意力机制头数
@@ -76,7 +80,7 @@ num_dec_blocks = 6
 residual_dropout_rate = 0.1
 # 是否共享编码器词嵌入的权重
 share_embedding = True
-# 指定批大小
+# 指定批大小 [batch:16->Global Step:1280]
 batch_size = 16
 # 热身步数
 warmup_steps = 12000

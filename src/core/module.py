@@ -11,6 +11,7 @@ import numpy as np
 from torch import nn
 import torch.nn.functional as F
 from src.lib.util import Util
+from src.conf import args
 
 
 # 多头注意力机制
@@ -372,3 +373,68 @@ class Transformer(nn.Module):
         loss = self.crit(logits.reshape(-1, self.vocab_size), target_out.view(-1))
 
         return loss
+
+
+# 定义解码识别模块
+class Recognizer(object):
+    def __init__(self, model, unit2char=None, beam_width=5, max_len=100):
+        self.model = model
+        self.model.eval()
+        self.unit2char = unit2char
+        self.beam_width = beam_width
+        self.max_len = max_len
+
+    def recognize(self, inputs):
+        enc_states, enc_masks = self.model.encoder(inputs)
+
+        # 将编码状态重复beam_width次
+        beam_enc_states = enc_states.repeat([self.beam_width, 1, 1])
+        beam_enc_mask = enc_masks.repeat([self.beam_width, 1, 1])
+
+        # 设置初始预测标记 <BOS>, 维度为[beam_width, 1]
+        preds = torch.ones([self.beam_width, 1], dtype=torch.long, device=enc_states.device) * args.vocab['<BOS>']
+
+        # 定义每个分支的分数, 维度为[beam_width, 1]
+        global_scores = torch.FloatTensor([0.0] + [-float('inf')] * (self.beam_width - 1))
+        global_scores = global_scores.to(enc_states.device).unsqueeze(1)
+
+        # 定义结束标记，任意分支出现停止标记1则解码结束， 维度为 [beam_width, 1]
+        stop_or_not = torch.zeros_like(global_scores, dtype=torch.bool)
+
+        def decode_step(pred_hist, scores, flag):
+            """ decode an utterance in a stepwise way"""
+            batch_log_probs = self.model.decoder.recognize(pred_hist, beam_enc_states, beam_enc_mask).detach()
+            last_k_scores, last_k_preds = batch_log_probs.topk(self.beam_width)  # 计算每个分支最大的beam_width个标记
+            # 分数更新
+            scores = scores + last_k_scores
+            scores = scores.view(self.beam_width * self.beam_width)
+            # 保存所有路径中的前k个路径
+            scores, best_k_indices = torch.topk(scores, k=self.beam_width)
+            scores = scores.view(-1, 1)
+            # 更新预测
+            pred = pred_hist.repeat([self.beam_width, 1])
+            pred = torch.cat((pred, last_k_preds.view(-1, 1)), dim=1)
+            best_k_preds = torch.index_select(pred, dim=0, index=best_k_indices)
+            # 判断最后一个是不是结束标记
+            flag = torch.eq(best_k_preds[:, -1], args.vocab['<EOS>']).view(-1, 1)
+            return best_k_preds, scores, flag
+
+        with torch.no_grad():
+            for _ in range(1, self.max_len + 1):
+                preds, global_scores, stop_or_not = decode_step(preds, global_scores, stop_or_not)
+                # 判断是否停止，任意分支解码到结束标记或者达到最大解码步数则解码停止
+                if stop_or_not.sum() > 0: break
+
+            max_indices = torch.argmax(global_scores, dim=-1).long()
+            preds = preds.view(self.beam_width, -1)
+            best_preds = torch.index_select(preds, dim=0, index=max_indices)
+
+            # 删除起始标记 BOS
+            best_preds = best_preds[0, 1:]
+            results = []
+            for i in best_preds:
+                if int(i) == args.vocab['<EOS>']:
+                    break
+                results.append(self.unit2char[int(i)])
+
+        return ''.join(results)
