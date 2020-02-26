@@ -197,6 +197,19 @@ class Util(object):
 
             print('Normlize %s TEXT!' % name)
 
+    @staticmethod
+    def get_seq_mask(targets):
+        """
+        遮掉未来的文本信息
+        :param targets:
+        :return:
+        """
+        batch_size, steps = targets.size()
+        seq_mask = torch.ones([batch_size, steps, steps], device=targets.device)
+        seq_mask = torch.tril(seq_mask).bool()
+
+        return seq_mask
+
 
 class DataUtil(object):
     def __init__(self):
