@@ -6,6 +6,7 @@ import copy
 import string
 import torch
 import numpy as np
+import pandas as pd
 import torchaudio as ta
 
 from zhon import hanzi
@@ -41,7 +42,7 @@ class Util(object):
         :param t:
         :return:
         """
-        h, m, s = t.strip().split(':')
+        h, m, s = t.strip().split(":")
 
         return float(h) * 3600 + float(m) * 60 + float(s)
 
@@ -215,6 +216,24 @@ class Util(object):
     def get_learning_rate(step):
         return args.lr_factor * args.model_size ** (-0.5) * min(step ** (-0.5), step * args.warmup_steps ** (-1.5))
 
+    @staticmethod
+    def generate_result():
+        data_reault_path = args.data_reault_path
+        sample_submission_path = args.sample_submission_path
+        data_submission_path = args.data_submission_path
+
+        result = pd.read_csv(data_reault_path)
+        sample_submission = pd.read_csv(sample_submission_path)
+        result = dict(zip(result['id'], result['words']))
+        for index in range(sample_submission.shape[0]):
+            value = result[sample_submission.iloc[index, 0]]
+            # if value == '<UNK>':
+            #     value = ''
+            sample_submission.iloc[index, 1] = value
+
+        sample_submission.to_csv(data_submission_path, index=None)
+        print(sample_submission)
+
 
 class DataUtil(object):
     def __init__(self):
@@ -361,3 +380,6 @@ if __name__ == '__main__':
 
     # 词表生成
     # DataUtil().generate_vocab_table()
+
+    # 生成结果
+    Util.generate_result()
