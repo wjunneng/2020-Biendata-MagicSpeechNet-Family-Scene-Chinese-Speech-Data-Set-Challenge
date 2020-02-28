@@ -6,8 +6,10 @@ import copy
 import string
 import torch
 import numpy as np
+import librosa
 import torchaudio as ta
 
+from skimage.restoration import (denoise_wavelet, estimate_sigma)
 from zhon import hanzi
 from torch.utils.data import Dataset
 from src.conf import args
@@ -215,6 +217,108 @@ class Util(object):
     def get_learning_rate(step):
         return args.lr_factor * args.model_size ** (-0.5) * min(step ** (-0.5), step * args.warmup_steps ** (-1.5))
 
+    @staticmethod
+    def draw(nframes, framerate, data):
+        """
+        :param nframes: 采样点个数
+        :param framerate: 采样频率
+        :return:
+        """
+        from matplotlib import pyplot as plt
+
+        # 采样点的时间间隔
+        sample_time = 1 / framerate
+        # 20毫秒左右
+        print('一帧持续的时间{}'.format(sample_time))
+        # 声音信号的长度
+        time = nframes / framerate
+
+        x_seq = np.arange(0, time, sample_time)
+        x_seq = x_seq[:nframes, ]
+        plt.plot(x_seq, data.reshape([-1, 1]), 'blue')
+        plt.xlabel("time (s)")
+        plt.show()
+
+    @staticmethod
+    def mfcc(data, sampling_rate, n_mfcc):
+        """
+        Compute mel-scaled feature using librosa
+        :param data:
+        :param sampling_rate:
+        :param n_mfcc:
+        :return:
+        """
+        data = librosa.feature.mfcc(data, sr=sampling_rate, n_mfcc=n_mfcc)
+        # data = np.expand_dims(data, axis=-1)
+        return data
+
+    @staticmethod
+    def padding(data, input_length):
+        """
+            Padding of samples to make them of same length
+        """
+        if len(data) > input_length:
+            max_offset = len(data) - input_length
+            offset = np.random.randint(max_offset)
+            data = data[offset:(input_length + offset)]
+        else:
+            if input_length > len(data):
+                max_offset = input_length - len(data)
+                offset = np.random.randint(max_offset)
+            else:
+                offset = 0
+            data = np.pad(data, (offset, input_length - len(data) - offset), "constant")
+
+        return data
+
+    @staticmethod
+    def padding_numpy(data, input_len):
+        """
+            二维数组 padding
+        """
+        if data.shape[1] > input_len:
+            return data[:, :input_len]
+        else:
+            return np.pad(data, ((0, 0), (0, input_len - data.shape[1])), 'constant')
+
+    @staticmethod
+    def apply_per_channel_energy_norm(data, sampling_rate):
+        """
+        Compute Per-Channel Energy Normalization (PCEN)
+        :param data:
+        :param sampling_rate:
+        :return:
+        """
+        # Compute mel-scaled spectrogram
+        S = librosa.feature.melspectrogram(data, sr=sampling_rate, power=1)
+        # Convert an amplitude spectrogram to dB-scaled spectrogram
+        # log_S = librosa.amplitude_to_db(S, ref=np.max)
+        pcen_S = librosa.core.pcen(S)
+
+        return pcen_S
+
+    @staticmethod
+    def wavelet_denoising(data):
+        """
+        Wavelet Denoising using scikit-image
+        NOTE: Wavelet denoising is an effective method for SNR improvement in environments with
+                  wide range of noise types competing for the same subspace.
+        """
+        sigma_est = estimate_sigma(data, multichannel=True, average_sigmas=True)
+        im_bayes = denoise_wavelet(data, multichannel=True, convert2ycbcr=False, method='BayesShrink',
+                                   mode='soft')
+        # im_visushrink = denoise_wavelet(data, multichannel=False, convert2ycbcr=True, method='VisuShrink',
+        #                                 mode='soft')
+        #
+        # # VisuShrink is designed to eliminate noise with high probability, but this
+        # # results in a visually over-smooth appearance. Here, we specify a reduction
+        # # in the threshold by factors of 2 and 4.
+        # im_visushrink2 = denoise_wavelet(data, multichannel=True, convert2ycbcr=False, method='VisuShrink',
+        #                                  mode='soft', sigma=sigma_est / 2)
+        # im_visushrink4 = denoise_wavelet(data, multichannel=False, convert2ycbcr=True, method='VisuShrink',
+        #                                  mode='soft', sigma=sigma_est / 4)
+        return im_bayes
+
 
 class DataUtil(object):
     def __init__(self):
@@ -320,12 +424,28 @@ class AudioDataset(Dataset):
 
     def __getitem__(self, index):
         uttid, path = self.file_list[index]
-        wavform, _ = ta.load_wav(path)  # 加载wav文件
-        feature = ta.compliance.kaldi.fbank(wavform, num_mel_bins=40)  # 计算fbank特征
-        # 特征归一化
-        mean = torch.mean(feature)
-        std = torch.std(feature)
-        feature = (feature - mean) / std
+        # wavform, _ = ta.load_wav(path)  # 加载wav文件
+        # feature = ta.compliance.kaldi.fbank(wavform, num_mel_bins=40)  # 计算fbank特征
+        # # 特征归一化
+        # mean = torch.mean(feature)
+        # std = torch.std(feature)
+        # feature = (feature - mean) / std
+
+        # ################# librosa
+        y_16k, sr_16k = librosa.core.load(path, sr=16000, res_type='kaiser_fast')
+        # mfcc
+        y_16k = Util.mfcc(y_16k, sampling_rate=sr_16k, n_mfcc=args.input_size)
+        # 标准化
+        y_16k = Util.apply_per_channel_energy_norm(data=y_16k.flatten(), sampling_rate=sr_16k)
+        # 去静音
+        # y_16k = Util.wavelet_denoising(data=y_16k)
+        # 填充
+        y_16k = Util.padding_numpy(y_16k, args.input_size)
+
+        # Util.draw(nframes=y_16k.size, framerate=16000, data=y_16k)
+
+        feature = torch.from_numpy(y_16k)
+        feature = (feature - torch.mean(feature)) / torch.std(feature)
 
         if self.targets_dict is not None:
             targets = self.targets_dict[uttid]

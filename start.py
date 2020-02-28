@@ -48,7 +48,8 @@ class Run(object):
         dataloader = DataLoader(dataset, batch_size=self.args.batch_size, shuffle=True, num_workers=2, pin_memory=False,
                                 collate_fn=DataUtil.collate_fn)
 
-        lr = Util.get_learning_rate(step=1)
+        # lr = Util.get_learning_rate(step=1)
+        lr = self.args.lr_factor
         optimizer = torch.optim.Adam(model.parameters(), lr=lr, betas=(0.9, 0.98), eps=1e-9)
 
         if not os.path.exists(self.args.data_model_dir):
@@ -82,7 +83,8 @@ class Run(object):
                     step_loss = 0
 
                     # 学习率更新
-                    lr = Util.get_learning_rate(global_step)
+                    # lr = Util.get_learning_rate(global_step)
+                    lr = self.args.lr_factor
                     for param_group in optimizer.param_groups:
                         param_group['lr'] = lr
 
@@ -119,7 +121,7 @@ class Run(object):
                                                       pin_memory=False, collate_fn=DataUtil.collate_fn)
 
         # checkpoints = torch.load('./model/model.pt', map_location=lambda storage, loc: storage)
-        checkpoints = torch.load(os.path.join(self.args.data_model_dir, 'model.epoch.2.pt'))
+        checkpoints = torch.load(os.path.join(self.args.data_model_dir, 'model.epoch.9.pt'))
         eval_model.load_state_dict(checkpoints)
 
         recognizer = Recognizer(eval_model, unit2char=idx2unit)
@@ -145,5 +147,5 @@ if __name__ == '__main__':
     Run().train()
     current_time = time.clock()
     print('train using time: {}'.format(current_time - start))
-    Run().predict()
+    # Run().predict()
     print('predict using time: {}'.format(time.clock() - current_time))
