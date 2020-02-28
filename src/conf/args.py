@@ -6,7 +6,7 @@ os.chdir(sys.path[0])
 
 # project_dir: .../2020-Biendata-MagicSpeechNet-Family-Scene-Chinese-Speech-Data-Set-Challenge
 # project_dir = '/'.join(os.path.abspath('..').split('/')[:-1])
-project_dir = '/home/wjunneng/Ubuntu/2020-Biendata-MagicSpeechNet-Family-Scene-Chinese-Speech-Data-Set-Challenge'
+project_dir = '/data/2019_Form/2020-Biendata-MagicSpeechNet-Family-Scene-Chinese-Speech-Data-Set-Challenge'
 
 # src dir: .../2020-Biendata-MagicSpeechNet-Family-Scene-Chinese-Speech-Data-Set-Challenge/src
 src_dir = os.path.join(project_dir, 'src')
@@ -61,6 +61,8 @@ data_model_dir = os.path.join(data_dir, 'model')
 # -* result *-
 # data result path
 data_reault_path = os.path.join(data_dir, 'result.csv')
+sample_submission_path = os.path.join(magicdata_dir, 'sample_submission.csv')
+data_submission_path = os.path.join(data_dir, 'submission.csv')
 
 vocab_path = os.path.join(data_dir, 'vocab.txt')
 vocab = {'<PAD>': 0, '<BOS>': 1, '<EOS>': 2, '<UNK>': 3}
