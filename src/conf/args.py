@@ -6,7 +6,8 @@ os.chdir(sys.path[0])
 
 # project_dir: .../2020-Biendata-MagicSpeechNet-Family-Scene-Chinese-Speech-Data-Set-Challenge
 # project_dir = '/'.join(os.path.abspath('..').split('/')[:-1])
-project_dir = '/data/2019_Form/2020-Biendata-MagicSpeechNet-Family-Scene-Chinese-Speech-Data-Set-Challenge'
+# project_dir = '/data/2019_Form/2020-Biendata-MagicSpeechNet-Family-Scene-Chinese-Speech-Data-Set-Challenge'
+project_dir = '/home/wjunneng/Ubuntu/2020-Biendata-MagicSpeechNet-Family-Scene-Chinese-Speech-Data-Set-Challenge'
 
 # src dir: .../2020-Biendata-MagicSpeechNet-Family-Scene-Chinese-Speech-Data-Set-Challenge/src
 src_dir = os.path.join(project_dir, 'src')
@@ -85,7 +86,7 @@ residual_dropout_rate = 0.3
 # 是否共享编码器词嵌入的权重
 share_embedding = True
 # 指定批大小 [batch:16->Global Step:1280]
-batch_size = 24
+batch_size = 96
 # 热身步数
 warmup_steps = 12000
 # 学习率因子

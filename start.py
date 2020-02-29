@@ -121,7 +121,7 @@ class Run(object):
                                                       pin_memory=False, collate_fn=DataUtil.collate_fn)
 
         # checkpoints = torch.load('./model/model.pt', map_location=lambda storage, loc: storage)
-        checkpoints = torch.load(os.path.join(self.args.data_model_dir, 'model.epoch.9.pt'))
+        checkpoints = torch.load(os.path.join(self.args.data_model_dir, 'model.epoch.30.pt'))
         eval_model.load_state_dict(checkpoints)
 
         recognizer = Recognizer(eval_model, unit2char=idx2unit)
@@ -144,8 +144,8 @@ class Run(object):
 
 if __name__ == '__main__':
     start = time.clock()
-    Run().train()
+    # Run().train()
     current_time = time.clock()
     print('train using time: {}'.format(current_time - start))
-    # Run().predict()
+    Run().predict()
     print('predict using time: {}'.format(time.clock() - current_time))
