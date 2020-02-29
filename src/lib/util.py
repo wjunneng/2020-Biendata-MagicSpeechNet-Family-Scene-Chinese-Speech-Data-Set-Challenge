@@ -7,6 +7,7 @@ import string
 import torch
 import numpy as np
 import librosa
+import pandas as pd
 import torchaudio as ta
 
 from skimage.restoration import (denoise_wavelet, estimate_sigma)
@@ -319,6 +320,22 @@ class Util(object):
         #                                  mode='soft', sigma=sigma_est / 4)
         return im_bayes
 
+    @staticmethod
+    def generate_result():
+        data_result_path = args.data_reault_path
+        sample_submission_path = args.sample_submission_path
+        data_submission_path = args.data_submission_path
+
+        result = pd.read_csv(data_result_path)
+        sample_submission = pd.read_csv(sample_submission_path)
+        result = dict(zip(result['id'], result['words']))
+        for index in range(sample_submission.shape[0]):
+            value = result[sample_submission.iloc[index, 0]]
+            sample_submission.iloc[index, 1] = value
+
+        sample_submission.to_csv(data_submission_path, index=None)
+        print(sample_submission)
+
 
 class DataUtil(object):
     def __init__(self):
@@ -481,3 +498,6 @@ if __name__ == '__main__':
 
     # 词表生成
     # DataUtil().generate_vocab_table()
+
+    # 生成结果
+    Util.generate_result()
