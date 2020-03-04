@@ -825,3 +825,118 @@ for epoch in range(total_epochs):
     checkpoint = model.state_dict()
     torch.save(checkpoint, os.path.join('./model', 'model.epoch.%d.pt' % epoch))
 print('Done!')
+
+# 定义解码识别模块
+class Recognizer():
+    def __init__(self, model, unit2char=None, beam_width=5, max_len=100):
+
+        self.model = model
+        self.model.eval()
+        self.unit2char = unit2char
+        self.beam_width = beam_width
+        self.max_len = max_len
+
+    def recognize(self, inputs):
+
+        enc_states, enc_masks = self.model.encoder(inputs)
+
+        # 将编码状态重复beam_width次
+        beam_enc_states = enc_states.repeat([self.beam_width, 1, 1])
+        beam_enc_mask = enc_masks.repeat([self.beam_width, 1, 1])
+
+        # 设置初始预测标记 <BOS>, 维度为[beam_width, 1]
+        preds = torch.ones([self.beam_width, 1], dtype=torch.long, device=enc_states.device) * BOS
+
+        # 定义每个分支的分数, 维度为[beam_width, 1]
+        global_scores = torch.FloatTensor([0.0] + [-float('inf')] * (self.beam_width - 1))
+        global_scores = global_scores.to(enc_states.device).unsqueeze(1)
+
+        # 定义结束标记，任意分支出现停止标记1则解码结束， 维度为 [beam_width, 1]
+        stop_or_not = torch.zeros_like(global_scores, dtype=torch.bool)
+
+        def decode_step(pred_hist, scores, flag):
+            """ decode an utterance in a stepwise way"""
+            batch_log_probs = self.model.decoder.recognize(pred_hist, beam_enc_states, beam_enc_mask).detach()
+            last_k_scores, last_k_preds = batch_log_probs.topk(self.beam_width) # 计算每个分支最大的beam_width个标记
+            # 分数更新
+            scores = scores + last_k_scores
+            scores = scores.view(self.beam_width * self.beam_width)
+            # 保存所有路径中的前k个路径
+            scores, best_k_indices = torch.topk(scores, k=self.beam_width)
+            scores = scores.view(-1, 1)
+            # 更新预测
+            pred = pred_hist.repeat([self.beam_width, 1])
+            pred = torch.cat((pred, last_k_preds.view(-1, 1)), dim=1)
+            best_k_preds = torch.index_select(pred, dim=0, index=best_k_indices)
+            # 判断最后一个是不是结束标记
+            flag = torch.eq(best_k_preds[:, -1], EOS).view(-1, 1)
+            return best_k_preds, scores, flag
+
+        with torch.no_grad():
+
+            for _ in range(1, self.max_len+1):
+                preds, global_scores, stop_or_not = decode_step(preds, global_scores, stop_or_not)
+                # 判断是否停止，任意分支解码到结束标记或者达到最大解码步数则解码停止
+                if stop_or_not.sum() > 0: break
+
+            max_indices = torch.argmax(global_scores, dim=-1).long()
+            preds = preds.view(self.beam_width, -1)
+            best_preds = torch.index_select(preds, dim=0, index=max_indices)
+
+            # 删除起始标记 BOS
+            best_preds = best_preds[0, 1:]
+            results = []
+            for i in best_preds:
+                if int(i) == EOS:
+                    break
+                results.append(self.unit2char[int(i)])
+        return ''.join(results)
+
+
+# 定义评估模型
+eval_model = Transformer(input_size=input_size,
+                        vocab_size=vocab_size,
+                        d_model=model_size,
+                        n_heads=n_heads,
+                        d_ff=model_size * 4,
+                        num_enc_blocks=num_enc_blocks,
+                        num_dec_blocks=num_dec_blocks,
+                        residual_dropout_rate=0.0,
+                        share_embedding=share_embedding)
+
+if torch.cuda.is_available():
+    eval_model.cuda() # 将模型加载到GPU中
+
+# 将模型加载
+idx2unit = {}
+with open('./data/vocab', 'r', encoding='utf-8') as fr:
+    for line in fr:
+        unit, idx = line.strip().split()
+        idx2unit[int(idx)] = unit
+
+wav_list = ['./data/test/wav.scp']
+test_dataset = AudioDataset(wav_list)
+test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=1,
+                                              shuffle=False, num_workers=2, pin_memory=False,
+                                              collate_fn=collate_fn)
+
+# checkpoints = torch.load('./model/model.pt', map_location=lambda storage, loc: storage)
+checkpoints = torch.load('./model/model.epoch.59.pt')
+eval_model.load_state_dict(checkpoints)
+
+recognizer = Recognizer(eval_model, unit2char=idx2unit)
+
+csv_writer = open('result.csv', 'w', encoding='utf-8')
+csv_writer.write('id,words\n')
+print('Begin to decode test set!')
+total_num = len(test_dataloader)
+for step, (uttid, inputs) in enumerate(test_dataloader):
+    # 将输入加载到GPU中
+    if torch.cuda.is_available():
+        inputs = inputs.cuda()
+    preds = recognizer.recognize(inputs)
+    print('[%5d/%d] %s %s' % (step, total_num, uttid[0], preds)) # 打印输出结果
+    csv_writer.write(','.join([uttid[0], preds])+'\n')
+csv_writer.close()
+print('Done!')
+
