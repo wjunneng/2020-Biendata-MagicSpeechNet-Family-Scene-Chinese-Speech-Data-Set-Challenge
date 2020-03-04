@@ -8,12 +8,11 @@ import torch
 import numpy as np
 import librosa
 import pandas as pd
-import torchaudio as ta
 
 from skimage.restoration import (denoise_wavelet, estimate_sigma)
 from zhon import hanzi
 from torch.utils.data import Dataset
-from src.conf import args
+from seq2seq.conf import args
 
 os.chdir(sys.path[0])
 

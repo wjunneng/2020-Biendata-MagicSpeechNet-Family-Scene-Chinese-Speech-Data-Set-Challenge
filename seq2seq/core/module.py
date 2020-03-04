@@ -10,8 +10,8 @@ import torch
 import numpy as np
 from torch import nn
 import torch.nn.functional as F
-from src.lib.util import Util
-from src.conf import args
+from seq2seq.lib.util import Util
+from seq2seq.conf import args
 
 
 # 多头注意力机制

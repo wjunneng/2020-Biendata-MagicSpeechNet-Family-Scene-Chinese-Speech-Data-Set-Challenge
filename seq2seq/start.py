@@ -7,9 +7,9 @@ os.chdir(sys.path[0])
 
 import torch
 from torch.utils.data import DataLoader
-from src.lib.util import AudioDataset, DataUtil, Util
-from src.conf import args
-from src.core.module import Transformer, Recognizer
+from seq2seq.lib.util import AudioDataset, DataUtil
+from seq2seq.conf import args
+from seq2seq.core.module import Transformer, Recognizer
 
 
 class Run(object):
