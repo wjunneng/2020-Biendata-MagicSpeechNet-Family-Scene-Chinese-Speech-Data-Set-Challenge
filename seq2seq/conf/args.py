@@ -67,7 +67,7 @@ data_submission_path = os.path.join(data_dir, 'submission.csv')
 vocab_path = os.path.join(data_dir, 'vocab.txt')
 vocab = {'<PAD>': 0, '<BOS>': 1, '<EOS>': 2, '<UNK>': 3}
 # 需要时刻注意是否更新
-vocab_size = 3863
+vocab_size = 3864
 
 # -* model arguments *-
 # 模型迭代次数
@@ -81,16 +81,16 @@ num_enc_blocks = 6
 # 解码器层数
 num_dec_blocks = 6
 # 残差连接丢弃率
-residual_dropout_rate = 0.3
+residual_dropout_rate = 0.1
 # 是否共享编码器词嵌入的权重
 share_embedding = True
 # 指定批大小 [batch:16->Global Step:1280]
-batch_size = 96
+batch_size = 16
 # 热身步数
 warmup_steps = 12000
 # 学习率因子
-lr_factor = 0.0002
+lr_factor = 1.0
 # 梯度累计步数
 accu_grads_steps = 8
 # 输入特征维度
-input_size = 16
+input_size = 40

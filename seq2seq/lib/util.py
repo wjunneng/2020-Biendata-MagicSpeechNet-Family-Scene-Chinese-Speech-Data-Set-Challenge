@@ -9,6 +9,7 @@ import numpy as np
 import librosa
 import pandas as pd
 
+import torchaudio as ta
 from skimage.restoration import (denoise_wavelet, estimate_sigma)
 from zhon import hanzi
 from torch.utils.data import Dataset
@@ -37,13 +38,13 @@ class Util(object):
         os.system(cmds)
 
     @staticmethod
-    def time2sed(t):
+    def time2sec(t):
         """
         时间转秒
         :param t:
         :return:
         """
-        h, m, s = t.strip().split(':')
+        h, m, s = t.strip().split(":")
 
         return float(h) * 3600 + float(m) * 60 + float(s)
 
@@ -54,9 +55,9 @@ class Util(object):
         :param self:
         :return:
         """
-        with open(file=json_file, mode='r') as file:
-            json_lines = file.readlines()
-            json_str = ''.join(json_lines).replace('\n', '').replace(' ', '').replace(',}', '}')
+        with open(json_file, 'r') as f:
+            lines = f.readlines()
+            json_str = ''.join(lines).replace('\n', '').replace(' ', '').replace(',}', '}')
 
             return json.loads(json_str)
 
@@ -67,7 +68,7 @@ class Util(object):
         :return:
         """
         for name in ['train', 'dev']:
-            save_dir = os.path.join(args.project_dir, 'data', name, 'wav')
+            save_dir = os.path.join(args.data_dir, name, 'wav')
             if os.path.exists(save_dir) is False:
                 os.makedirs(save_dir)
 
@@ -77,7 +78,6 @@ class Util(object):
                 if wav[0] == '.':
                     continue  # 跳过隐藏文件
 
-                suffix = None
                 if name == 'dev':
                     parts = wav.split('_')
                     jf = '_'.join(parts[:-1]) + '.json'
@@ -96,16 +96,16 @@ class Util(object):
                         tgt_id = session_id + '_' + str(i) + '.wav'
 
                     # 句子切分
-                    start_time = Util.time2sed(utt_info['start_time']['original'])
-                    end_time = Util.time2sed(utt_info['end_time']['original'])
+                    start_time = Util.time2sec(utt_info['start_time']['original'])
+                    end_time = Util.time2sec(utt_info['end_time']['original'])
 
                     src_wav = os.path.join(sub_audio_dir, wav)
                     tgt_wav = os.path.join(save_dir, tgt_id)
                     Util.segment_wav(src_wav=src_wav, tgt_wav=tgt_wav, start_time=start_time, end_time=end_time)
                     seg_wav_list.append((tgt_id, tgt_wav, utt_info['words']))
 
-            with open(os.path.join(args.project_dir, 'data', name, 'wav.scp'), 'w') as ww:
-                with open(os.path.join(args.project_dir, 'data', name, 'transcrpts.txt'), 'w', encoding='utf-8') as tw:
+            with open(os.path.join(args.data_dir, name, 'wav.scp'), 'w') as ww:
+                with open(os.path.join(args.data_dir, name, 'transcrpts.txt'), 'w', encoding='utf-8') as tw:
                     for uttid, wavdir, text in seg_wav_list:
                         ww.write(uttid + ' ' + wavdir + '\n')
                         tw.write(uttid + ' ' + text + '\n')
@@ -126,7 +126,7 @@ class Util(object):
         for wav in os.listdir(sub_audio_dir):
             # 跳过隐藏文文件和IOS的音频文件
             if wav[0] == '.' or 'IOS' not in wav:
-                continue
+                continue  # 跳过隐藏文件和非IOS的音频文件
 
             jf = '_'.join(wav.split('_')[:-1]) + '.json'
             utt_list = Util.load_json(os.path.join(args.transcription_dir, 'test_no_ref_noise', jf))
@@ -134,14 +134,10 @@ class Util(object):
                 utt_info = utt_list[i]
                 session_id = utt_info['session_id']
                 uttid = utt_info['uttid']
-
-                # 如果句子已经标注，则跳过
-                if 'word' in utt_info:
-                    continue
-
+                if 'words' in utt_info: continue  # 如果句子已经标注，则跳过
                 # 句子切分
-                start_time = Util.time2sed(utt_info['start_time'])
-                end_time = Util.time2sed(utt_info['end_time'])
+                start_time = Util.time2sec(utt_info['start_time'])
+                end_time = Util.time2sec(utt_info['end_time'])
 
                 tgt_id = uttid + '.wav'
                 src_wav = os.path.join(sub_audio_dir, wav)
@@ -165,15 +161,13 @@ class Util(object):
         new_seq = []
         for c in seq:
             if c == '+':
-                # 文档中有加号，单独处理，避免删除
-                new_seq.append(c)
+                new_seq.append(c)  # 文档中有加号，所以单独处理，避免删除
             elif c in string.punctuation or c in hanzi.punctuation:
-                # 删除全部的半角符号和全角符号
-                continue
+                continue  # 删除全部的半角标点和全角标点
             else:
-                if str(c).isalpha():
-                    new_seq.append(c.lower())
-
+                if c.encode('UTF-8').isalpha():
+                    c = c.lower()  # 大写字母转小写
+                new_seq.append(c)
         return ' '.join(new_seq)
 
     @staticmethod
@@ -189,27 +183,19 @@ class Util(object):
                         parts = line.split()
                         uttid = parts[0]
                         seqs = ''.join(parts[1:])
-
-                        # 直接跳过包含特殊标记的句子
                         if '[' in seqs:
-                            continue
-
+                            continue  # 直接跳过包含特殊标记的句子
                         seqs = Util.text_normlization(seqs)
                         tw.write(uttid + ' ' + seqs + '\n')
 
             print('Normlize %s TEXT!' % name)
 
     @staticmethod
+    # 遮掉未来的文本信息
     def get_seq_mask(targets):
-        """
-        遮掉未来的文本信息
-        :param targets:
-        :return:
-        """
         batch_size, steps = targets.size()
         seq_mask = torch.ones([batch_size, steps, steps], device=targets.device)
         seq_mask = torch.tril(seq_mask).bool()
-
         return seq_mask
 
     @staticmethod
@@ -350,24 +336,24 @@ class DataUtil(object):
         vocab_dict = {}
         for name in ['train', 'dev']:
             with open(os.path.join(args.data_dir, name, 'text.txt'), mode='r', encoding='utf-8') as file:
-                for line in file.readlines():
+                for line in file:
                     chars = line.strip().split()[1:]
-                    for char in chars:
-                        if char not in vocab_dict:
-                            vocab_dict[char] = 1
+                    for c in chars:
+                        if c in vocab_dict:
+                            vocab_dict[c] += 1
                         else:
-                            vocab_dict[char] += 1
+                            vocab_dict[c] = 1
 
         vocab_list = sorted(vocab_dict.items(), key=lambda x: x[1], reverse=True)
         vocab = copy.deepcopy(args.vocab)
-        for index, item in enumerate(vocab_list):
-            vocab[item[0]] = index + 4
+        for i in range(len(vocab_list)):
+            c = vocab_list[i][0]
+            vocab[c] = i + 4
 
         print('There are {} units in Vocabulary!'.format(len(vocab)))
-
         with open(args.vocab_path, mode='w', encoding='utf-8') as file:
-            for key, value in vocab.items():
-                file.write(key + ' ' + str(value) + '\n')
+            for c, id in vocab.items():
+                file.write(c + ' ' + str(id) + '\n')
 
         return len(vocab)
 
@@ -440,28 +426,28 @@ class AudioDataset(Dataset):
 
     def __getitem__(self, index):
         uttid, path = self.file_list[index]
-        # wavform, _ = ta.load_wav(path)  # 加载wav文件
-        # feature = ta.compliance.kaldi.fbank(wavform, num_mel_bins=40)  # 计算fbank特征
-        # # 特征归一化
-        # mean = torch.mean(feature)
-        # std = torch.std(feature)
-        # feature = (feature - mean) / std
+        wavform, _ = ta.load_wav(path)  # 加载wav文件
+        feature = ta.compliance.kaldi.fbank(wavform, num_mel_bins=40)  # 计算fbank特征
+        # 特征归一化
+        mean = torch.mean(feature)
+        std = torch.std(feature)
+        feature = (feature - mean) / std
 
         # ################# librosa
-        y_16k, sr_16k = librosa.core.load(path, sr=16000, res_type='kaiser_fast')
-        # mfcc
-        y_16k = Util.mfcc(y_16k, sampling_rate=sr_16k, n_mfcc=args.input_size)
-        # 标准化
-        y_16k = Util.apply_per_channel_energy_norm(data=y_16k.flatten(), sampling_rate=sr_16k)
-        # 去静音
-        # y_16k = Util.wavelet_denoising(data=y_16k)
-        # 填充
-        y_16k = Util.padding_numpy(y_16k, args.input_size)
-
-        # Util.draw(nframes=y_16k.size, framerate=16000, data=y_16k)
-
-        feature = torch.from_numpy(y_16k)
-        feature = (feature - torch.mean(feature)) / torch.std(feature)
+        # y_16k, sr_16k = librosa.core.load(path, sr=16000, res_type='kaiser_fast')
+        # # mfcc
+        # y_16k = Util.mfcc(y_16k, sampling_rate=sr_16k, n_mfcc=args.input_size)
+        # # 标准化
+        # y_16k = Util.apply_per_channel_energy_norm(data=y_16k.flatten(), sampling_rate=sr_16k)
+        # # 去静音
+        # # y_16k = Util.wavelet_denoising(data=y_16k)
+        # # 填充
+        # y_16k = Util.padding_numpy(y_16k, args.input_size)
+        #
+        # # Util.draw(nframes=y_16k.size, framerate=16000, data=y_16k)
+        #
+        # feature = torch.from_numpy(y_16k)
+        # feature = (feature - torch.mean(feature)) / torch.std(feature)
 
         if self.targets_dict is not None:
             targets = self.targets_dict[uttid]
@@ -485,18 +471,17 @@ class AudioDataset(Dataset):
 
 
 if __name__ == '__main__':
-    pass
     # 处理训练集和验证集
-    # Util.deal_train_dev()
+    Util.deal_train_dev()
 
     # 处理测试集
-    # Util.deal_test()
+    Util.deal_test()
 
     # 标准化训练和验证集
-    # Util.normal_train_dev()
+    Util.normal_train_dev()
 
     # 词表生成
-    # DataUtil().generate_vocab_table()
+    DataUtil().generate_vocab_table()
 
     # 生成结果
-    Util.generate_result()
+    # Util.generate_result()

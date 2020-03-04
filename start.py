@@ -7,7 +7,7 @@ os.chdir(sys.path[0])
 
 import torch
 from torch.utils.data import DataLoader
-from seq2seq.lib.util import AudioDataset, DataUtil
+from seq2seq.lib.util import AudioDataset, DataUtil, Util
 from seq2seq.conf import args
 from seq2seq.core.module import Transformer, Recognizer
 
@@ -24,16 +24,17 @@ class Run(object):
                 unit, idx = line.strip().split()
                 unit2idx[unit] = int(idx)
 
+        print('Set the size of vocab: %d' % self.args.vocab_size)
         # 模型定义
         model = Transformer(input_size=self.args.input_size,
-                                 vocab_size=self.args.vocab_size,
-                                 d_model=self.args.model_size,
-                                 n_heads=self.args.n_heads,
-                                 d_ff=self.args.model_size * 4,
-                                 num_enc_blocks=self.args.num_enc_blocks,
-                                 num_dec_blocks=self.args.num_dec_blocks,
-                                 residual_dropout_rate=self.args.residual_dropout_rate,
-                                 share_embedding=self.args.share_embedding)
+                            vocab_size=self.args.vocab_size,
+                            d_model=self.args.model_size,
+                            n_heads=self.args.n_heads,
+                            d_ff=self.args.model_size * 4,
+                            num_enc_blocks=self.args.num_enc_blocks,
+                            num_dec_blocks=self.args.num_dec_blocks,
+                            residual_dropout_rate=self.args.residual_dropout_rate,
+                            share_embedding=self.args.share_embedding)
         if torch.cuda.is_available():
             model.cuda()  # 将模型加载到GPU中
 
@@ -43,13 +44,14 @@ class Run(object):
 
         # 将模型加载
         train_wav_list = [self.args.data_train_wav_path, self.args.data_dev_wav_path]
-        train_text_list = [self.args.data_train_text_path, self.args.data_dev_wav_path]
+        train_text_list = [self.args.data_train_text_path, self.args.data_dev_text_path]
         dataset = AudioDataset(train_wav_list, train_text_list, unit2idx=unit2idx)
-        dataloader = DataLoader(dataset, batch_size=self.args.batch_size, shuffle=True, num_workers=2, pin_memory=False,
+        dataloader = DataLoader(dataset, batch_size=self.args.batch_size, shuffle=True,
+                                num_workers=2, pin_memory=False,
                                 collate_fn=DataUtil.collate_fn)
 
-        # lr = Util.get_learning_rate(step=1)
-        lr = self.args.lr_factor
+        lr = Util.get_learning_rate(step=1)
+        # lr = self.args.lr_factor
         optimizer = torch.optim.Adam(model.parameters(), lr=lr, betas=(0.9, 0.98), eps=1e-9)
 
         if not os.path.exists(self.args.data_model_dir):
@@ -83,8 +85,8 @@ class Run(object):
                     step_loss = 0
 
                     # 学习率更新
-                    # lr = Util.get_learning_rate(global_step)
-                    lr = self.args.lr_factor
+                    lr = Util.get_learning_rate(global_step)
+                    # lr = self.args.lr_factor
                     for param_group in optimizer.param_groups:
                         param_group['lr'] = lr
 
@@ -144,7 +146,7 @@ class Run(object):
 
 if __name__ == '__main__':
     start = time.clock()
-    # Run().train()
+    Run().train()
     current_time = time.clock()
     print('train using time: {}'.format(current_time - start))
     Run().predict()

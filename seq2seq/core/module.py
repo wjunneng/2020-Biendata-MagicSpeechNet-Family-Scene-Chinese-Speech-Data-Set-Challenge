@@ -67,7 +67,6 @@ class MultiHeadedAttention(nn.Module):
         p_attn = self.dropout(self.attn)
         x = torch.matmul(p_attn, v)  # (batch, head, time1, d_k)
         x = x.transpose(1, 2).contiguous().view(n_batch, -1, self.h * self.d_k)  # (batch, time1, d_model)
-
         return self.linear_out(x)  # (batch, time1, d_model)
 
 
@@ -89,7 +88,6 @@ class PositionwiseFeedForward(nn.Module):
     def forward(self, x):
         x = self.w_1(x)
         x = F.glu(x)
-
         return self.w_2(self.dropout(x))
 
 
@@ -145,9 +143,7 @@ class PositionalEncoding(nn.Module):
 
 # 编码器『未』
 class Conv2dSubsampling(nn.Module):
-    """
-    Convolutional 2D subsampling (to 1/4 length)
-    对输入数据进行维度变换，时间维度降采样，以及进行位置编码，模块输出长度是输入长度的四分之一
+    """Convolutional 2D subsampling (to 1/4 length)
 
     :param int idim: input dim
     :param int odim: output dim
@@ -168,22 +164,19 @@ class Conv2dSubsampling(nn.Module):
         )
 
     def forward(self, x, x_mask):
-        """
-        Subsample x
+        """Subsample x
 
         :param torch.Tensor x: input tensor
         :param torch.Tensor x_mask: input mask
         :return: subsampled x and mask
         :rtype Tuple[torch.Tensor, torch.Tensor]
         """
-        # (b, c, t, f)
-        x = x.unsqueeze(1)
+        x = x.unsqueeze(1)  # (b, c, t, f)
         x = self.conv(x)
         b, c, t, f = x.size()
         x = self.out(x.transpose(1, 2).contiguous().view(b, t, c * f))
         if x_mask is None:
             return x, None
-
         return x, x_mask[:, :, :-2:2][:, :, :-2:2]
 
 
@@ -202,8 +195,7 @@ class TransformerEncoderLayer(nn.Module):
         self.dropout2 = nn.Dropout(residual_dropout_rate)
 
     def forward(self, x, mask):
-        """
-        Compute encoded features
+        """Compute encoded features
 
         :param torch.Tensor x: encoded source features (batch, max_time_in, size)
         :param torch.Tensor mask: mask for x (batch, max_time_in)
@@ -376,8 +368,9 @@ class Transformer(nn.Module):
 
 
 # 定义解码识别模块
-class Recognizer(object):
+class Recognizer():
     def __init__(self, model, unit2char=None, beam_width=5, max_len=100):
+
         self.model = model
         self.model.eval()
         self.unit2char = unit2char
@@ -385,6 +378,7 @@ class Recognizer(object):
         self.max_len = max_len
 
     def recognize(self, inputs):
+
         enc_states, enc_masks = self.model.encoder(inputs)
 
         # 将编码状态重复beam_width次
@@ -420,6 +414,7 @@ class Recognizer(object):
             return best_k_preds, scores, flag
 
         with torch.no_grad():
+
             for _ in range(1, self.max_len + 1):
                 preds, global_scores, stop_or_not = decode_step(preds, global_scores, stop_or_not)
                 # 判断是否停止，任意分支解码到结束标记或者达到最大解码步数则解码停止
@@ -436,5 +431,4 @@ class Recognizer(object):
                 if int(i) == args.vocab['<EOS>']:
                     break
                 results.append(self.unit2char[int(i)])
-
         return ''.join(results)
