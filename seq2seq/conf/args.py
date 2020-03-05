@@ -94,14 +94,13 @@ lr_factor = 1.0
 # 梯度累计步数
 accu_grads_steps = 8
 
-if using_fbank:
-    # 输入特征维度
-    input_size = 40
-    # 指定批大小 [batch:16->Global Step:1280]
-    batch_size = 16
-
 if using_mfcc:
     # 输入特征维度
     input_size = 16
     # 指定批大小 [batch:16->Global Step:1280]
     batch_size = 96
+else:
+    # 输入特征维度
+    input_size = 40
+    # 指定批大小 [batch:16->Global Step:1280]
+    batch_size = 16

@@ -11,6 +11,10 @@ from seq2seq.lib.util import AudioDataset, DataUtil, Util
 from seq2seq.conf import args
 from seq2seq.core.module import Transformer, Recognizer
 
+import warnings
+
+warnings.filterwarnings('ignore')
+
 
 class Run(object):
     def __init__(self):
@@ -36,8 +40,9 @@ class Run(object):
                             residual_dropout_rate=self.args.residual_dropout_rate,
                             share_embedding=self.args.share_embedding)
 
-        checkpoints = torch.load(os.path.join(self.args.data_model_dir, 'model.epoch.8.pt'))
-        model.load_state_dict(checkpoints)
+        # 按照原本的模型接下来运行
+        # checkpoints = torch.load(os.path.join(self.args.data_model_dir, 'model.epoch.*.pt'))
+        # model.load_state_dict(checkpoints)
 
         if torch.cuda.is_available():
             model.cuda()  # 将模型加载到GPU中
@@ -150,10 +155,10 @@ class Run(object):
 
 if __name__ == '__main__':
     start = time.clock()
-    # Run().train()
+    Run().train()
     current_time = time.clock()
     print('train using time: {}'.format(current_time - start))
     # Run().predict()
     print('predict using time: {}'.format(time.clock() - current_time))
     # 生成提交结果
-    Util.generate_result()
+    # Util.generate_result()

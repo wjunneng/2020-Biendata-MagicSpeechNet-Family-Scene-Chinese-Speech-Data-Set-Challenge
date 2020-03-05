@@ -8,12 +8,16 @@ import torch
 import numpy as np
 import librosa
 import pandas as pd
-
 import torchaudio as ta
+
+from torch import nn
 from skimage.restoration import (denoise_wavelet, estimate_sigma)
 from zhon import hanzi
+from collections import namedtuple
 from torch.utils.data import Dataset
+
 from seq2seq.conf import args
+from seq2seq.lib.spec_augment import SpecAugment
 
 os.chdir(sys.path[0])
 
@@ -394,6 +398,25 @@ class DataUtil(object):
             return uttids, torch.FloatTensor(padded_features)
 
 
+class LabelSmoothingLoss(nn.Module):
+    def __init__(self, classes, smoothing=0.0, dim=-1):
+        super(LabelSmoothingLoss, self).__init__()
+        self.confidence = 1.0 - smoothing
+        self.smoothing = smoothing
+        self.cls = classes
+        self.dim = dim
+
+    def forward(self, pred, target):
+        pred = pred.log_softmax(dim=self.dim)
+        with torch.no_grad():
+            # true_dist = pred.data.clone()
+            true_dist = torch.zeros_like(pred)
+            true_dist.fill_(self.smoothing / (self.cls - 1))
+            true_dist.scatter_(1, target.data.unsqueeze(1), self.confidence)
+
+        return torch.mean(torch.sum(-true_dist * pred, dim=self.dim))
+
+
 class AudioDataset(Dataset):
     def __init__(self, wav_list, text_list=None, unit2idx=None):
 
@@ -427,30 +450,42 @@ class AudioDataset(Dataset):
     def __getitem__(self, index):
         uttid, path = self.file_list[index]
 
-        # ################# torchaudio
-        if args.using_fbank:
-            wavform, _ = ta.load_wav(path)  # 加载wav文件
-            feature = ta.compliance.kaldi.fbank(wavform, num_mel_bins=40)  # 计算fbank特征
-            # 特征归一化
-            mean = torch.mean(feature)
-            std = torch.std(feature)
-            feature = (feature - mean) / std
+        # # ################# torchaudio / baseline
+        # # 加载wav文件
+        # wavform, _ = ta.load_wav(path)
+        # # 计算fbank特征
+        # feature = ta.compliance.kaldi.fbank(wavform, num_mel_bins=40)
+        # # 特征归一化
+        # mean = torch.mean(feature)
+        # std = torch.std(feature)
+        # feature = (feature - mean) / std
+        # # #################
+
+        # ################## torchaudio + time wrap
+        AudioData = namedtuple('AudioData', ['sig', 'sr'])
+        spectro = SpecAugment.tfm_spectro(AudioData(*ta.load(path)), ws=512, hop=256, n_mels=args.input_size,
+                                          to_db_scale=True, f_max=8000, f_min=-80)
+
+        feature = SpecAugment.time_warp(spectro)
+        feature = feature.reshape(-1, args.input_size)
+        feature = (feature - torch.mean(feature)) / torch.std(feature)
+        # ################## torchaudio + time wrap
 
         # ################# librosa
-        if args.using_mfcc:
-            y_16k, sr_16k = librosa.core.load(path, sr=16000, res_type='kaiser_fast')
-            # mfcc
-            y_16k = Util.mfcc(y_16k, sampling_rate=sr_16k, n_mfcc=args.input_size)
-            # 标准化
-            y_16k = Util.apply_per_channel_energy_norm(data=y_16k.flatten(), sampling_rate=sr_16k)
-            # 去静音
-            # y_16k = Util.wavelet_denoising(data=y_16k)
-            # 填充
-            y_16k = Util.padding_numpy(y_16k, args.input_size)
-            # Util.draw(nframes=y_16k.size, framerate=16000, data=y_16k)
-
-            feature = torch.from_numpy(y_16k)
-            feature = (feature - torch.mean(feature)) / torch.std(feature)
+        # if args.using_mfcc:
+        #     y_16k, sr_16k = librosa.core.load(path, sr=16000, res_type='kaiser_fast')
+        #     # mfcc
+        #     y_16k = Util.mfcc(y_16k, sampling_rate=sr_16k, n_mfcc=args.input_size)
+        #     # 标准化
+        #     y_16k = Util.apply_per_channel_energy_norm(data=y_16k.flatten(), sampling_rate=sr_16k)
+        #     # 去静音
+        #     # y_16k = Util.wavelet_denoising(data=y_16k)
+        #     # 填充
+        #     y_16k = Util.padding_numpy(y_16k, args.input_size)
+        #     # Util.draw(nframes=y_16k.size, framerate=16000, data=y_16k)
+        #
+        #     feature = torch.from_numpy(y_16k)
+        #     feature = (feature - torch.mean(feature)) / torch.std(feature)
 
         if self.targets_dict is not None:
             targets = self.targets_dict[uttid]
@@ -486,4 +521,3 @@ if __name__ == '__main__':
 
     # 词表生成
     # DataUtil().generate_vocab_table()
-

@@ -12,6 +12,7 @@ from torch import nn
 import torch.nn.functional as F
 from seq2seq.lib.util import Util
 from seq2seq.conf import args
+from seq2seq.lib.util import LabelSmoothingLoss
 
 
 # 多头注意力机制
@@ -350,7 +351,11 @@ class Transformer(nn.Module):
                                           residual_dropout_rate=residual_dropout_rate,
                                           share_embedding=share_embedding)
 
-        self.crit = nn.CrossEntropyLoss()
+        # 交叉熵
+        # self.crit = nn.CrossEntropyLoss()
+        # 标签平滑
+        self.crit = LabelSmoothingLoss(classes=args.vocab_size, smoothing=0.2)
+
 
     def forward(self, inputs, targets):
         # 1. forward encoder
