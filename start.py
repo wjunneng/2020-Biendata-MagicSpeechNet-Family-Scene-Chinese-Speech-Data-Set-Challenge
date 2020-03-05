@@ -35,6 +35,10 @@ class Run(object):
                             num_dec_blocks=self.args.num_dec_blocks,
                             residual_dropout_rate=self.args.residual_dropout_rate,
                             share_embedding=self.args.share_embedding)
+
+        checkpoints = torch.load(os.path.join(self.args.data_model_dir, 'model.epoch.8.pt'))
+        model.load_state_dict(checkpoints)
+
         if torch.cuda.is_available():
             model.cuda()  # 将模型加载到GPU中
 
@@ -78,7 +82,7 @@ class Run(object):
 
                     optimizer.step()
                     optimizer.zero_grad()
-                    if global_step % 10 == 0:
+                    if global_step % 100 == 0:
                         print('-Training-Epoch-%d, Global Step:%d, lr:%.8f, Loss:%.5f' % (
                             epoch, global_step, lr, step_loss / self.args.accu_grads_steps))
                     global_step += 1
@@ -123,7 +127,7 @@ class Run(object):
                                                       pin_memory=False, collate_fn=DataUtil.collate_fn)
 
         # checkpoints = torch.load('./model/model.pt', map_location=lambda storage, loc: storage)
-        checkpoints = torch.load(os.path.join(self.args.data_model_dir, 'model.epoch.30.pt'))
+        checkpoints = torch.load(os.path.join(self.args.data_model_dir, 'model.epoch.23.pt'))
         eval_model.load_state_dict(checkpoints)
 
         recognizer = Recognizer(eval_model, unit2char=idx2unit)
@@ -146,8 +150,10 @@ class Run(object):
 
 if __name__ == '__main__':
     start = time.clock()
-    Run().train()
+    # Run().train()
     current_time = time.clock()
     print('train using time: {}'.format(current_time - start))
-    Run().predict()
+    # Run().predict()
     print('predict using time: {}'.format(time.clock() - current_time))
+    # 生成提交结果
+    Util.generate_result()
