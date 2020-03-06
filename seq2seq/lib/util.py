@@ -469,7 +469,11 @@ class AudioDataset(Dataset):
         spectro = SpecAugment.tfm_spectro(AudioData(*ta.load(path)), ws=512, hop=256, n_mels=args.input_size,
                                           to_db_scale=True, f_max=8000, f_min=-80)
 
-        feature = SpecAugment.time_warp(spectro)
+        # 注意: F 和 T决定着裁减大小
+        feature = SpecAugment.time_mask(
+            SpecAugment.freq_mask(SpecAugment.time_warp(spectro, W=2), F=20, num_masks=2), T=4,
+            num_masks=2)
+        feature = torch.transpose(feature, 1, 2)
         feature = feature.reshape(-1, args.input_size)
         feature = (feature - torch.mean(feature)) / torch.std(feature)
         # ################## torchaudio + time wrap
@@ -499,7 +503,8 @@ class AudioDataset(Dataset):
     def filter(self, feat_list):
         new_list = []
         for (uttid, path) in feat_list:
-            if uttid not in self.targets_dict: continue
+            if uttid not in self.targets_dict:
+                continue
             new_list.append([uttid, path])
         return new_list
 
