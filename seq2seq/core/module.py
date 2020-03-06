@@ -352,10 +352,9 @@ class Transformer(nn.Module):
                                           share_embedding=share_embedding)
 
         # 交叉熵
-        # self.crit = nn.CrossEntropyLoss()
+        self.crit = nn.CrossEntropyLoss()
         # 标签平滑
-        self.crit = LabelSmoothingLoss(classes=args.vocab_size, smoothing=0.2)
-
+        # self.crit = LabelSmoothingLoss(classes=args.vocab_size, smoothing=0.2)
 
     def forward(self, inputs, targets):
         # 1. forward encoder

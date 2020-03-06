@@ -320,7 +320,10 @@ class Util(object):
         result = dict(zip(result['id'], result['words']))
         for index in range(sample_submission.shape[0]):
             value = result[sample_submission.iloc[index, 0]]
-            sample_submission.iloc[index, 1] = value
+            if str(value) == 'nan':
+                sample_submission.iloc[index, 1] = '嗯'
+            else:
+                sample_submission.iloc[index, 1] = str(value)
 
         sample_submission.to_csv(data_submission_path, index=None)
         print(sample_submission)

@@ -158,7 +158,7 @@ if __name__ == '__main__':
     Run().train()
     current_time = time.clock()
     print('train using time: {}'.format(current_time - start))
-    # Run().predict()
+    Run().predict()
     print('predict using time: {}'.format(time.clock() - current_time))
     # 生成提交结果
-    # Util.generate_result()
+    Util.generate_result()
