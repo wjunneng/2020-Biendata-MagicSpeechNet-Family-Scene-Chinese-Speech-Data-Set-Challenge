@@ -34,6 +34,7 @@
 
 | trick | + score |
 | :----:| :----: |
+| Label Smoothing (无法收敛) | -0.03 | 
 | Time mask | - |
 | Frequency mask | - |
 | Time wrap | - |
