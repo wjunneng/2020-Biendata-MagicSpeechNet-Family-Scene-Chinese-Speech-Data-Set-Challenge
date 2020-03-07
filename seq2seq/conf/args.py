@@ -71,6 +71,14 @@ vocab_size = 3864
 
 using_mfcc = False
 using_fbank = True
+seed = 42
+
+# 增强类型
+enhance = {'0': 'fbank',
+           '9': 'time_warp',
+           '8': 'frequency_mask',
+           '7': 'time_mask'
+           }
 
 # -* model arguments *-
 # 模型迭代次数

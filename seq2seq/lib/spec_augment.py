@@ -3,8 +3,6 @@ import os
 import sys
 
 os.chdir(sys.path[0])
-from collections import namedtuple
-import torchaudio as ta
 from torchaudio import transforms
 import matplotlib.pyplot as plt
 import random
@@ -18,7 +16,7 @@ class SpecAugment(object):
     def tfm_spectro(ad, to_db_scale=False, n_fft=1024, ws=None, hop=None, f_min=0.0, f_max=-80, pad=0, n_mels=128):
         # We must reshape signal for torchaudio to generate the spectrogram.
         mel = transforms.MelSpectrogram(sample_rate=ad.sr, n_mels=n_mels, n_fft=n_fft, win_length=ws, hop_length=hop,
-                                        f_min=f_min, f_max=f_max, pad=pad, )(ad.sig.reshape(1, -1))
+                                        f_min=f_min, f_max=f_max, pad=pad)(ad.sig.reshape(1, -1))
         # swap dimension, mostly to look sane to a human.
         # mel = mel.permute(0, 2, 1)
 
@@ -100,6 +98,16 @@ class SpecAugment(object):
         print(spectrogram.shape)
 
 # if __name__ == '__main__':
-#     path = '/home/wjunneng/Ubuntu/2020-Biendata-MagicSpeechNet-Family-Scene-Chinese-Speech-Data-Set-Challenge/data/test/wav/MDT_Conversation_003-001.wav'
-#     # path = '/home/wjunneng/Ubuntu/2020-Biendata-MagicSpeechNet-Family-Scene-Chinese-Speech-Data-Set-Challenge/data/party-crowd.wav'
-#     SpecAugment(wav_path=path).main()
+#     # path = '/home/wjunneng/Ubuntu/2020-Biendata-MagicSpeechNet-Family-Scene-Chinese-Speech-Data-Set-Challenge/data/test/wav/MDT_Conversation_003-001.wav'
+#     path = '/home/wjunneng/Ubuntu/2020-Biendata-MagicSpeechNet-Family-Scene-Chinese-Speech-Data-Set-Challenge/data/party-crowd.wav'
+#
+#     # 加载wav文件
+#     wavform, _ = ta.load_wav(path)
+#     # 计算fbank特征
+#     feature = ta.compliance.kaldi.fbank(wavform, num_mel_bins=128)
+#     feature = feature.transpose(0, 1)
+#     feature = feature.unsqueeze(dim=0)
+#     # feature = ta.compliance.kaldi.spectrogram(waveform=wavform)
+#     # feature = feature.transpose(0, 1)
+#     # feature = feature.unsqueeze(dim=0)
+#     SpecAugment.tensor_to_img(SpecAugment().time_mask(feature))

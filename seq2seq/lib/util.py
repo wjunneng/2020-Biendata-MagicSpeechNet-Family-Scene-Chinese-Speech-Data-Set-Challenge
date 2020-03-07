@@ -80,7 +80,8 @@ class Util(object):
             sub_audio_dir = os.path.join(args.audio_dir, name)
             for wav in os.listdir(sub_audio_dir):
                 if wav[0] == '.':
-                    continue  # 跳过隐藏文件
+                    # 跳过隐藏文件
+                    continue
 
                 if name == 'dev':
                     parts = wav.split('_')
@@ -421,8 +422,8 @@ class LabelSmoothingLoss(nn.Module):
 
 
 class AudioDataset(Dataset):
-    def __init__(self, wav_list, text_list=None, unit2idx=None):
-
+    def __init__(self, wav_list, text_list=None, unit2idx=None, enhance_type='fbank'):
+        self.enhance_type = enhance_type
         self.unit2idx = unit2idx
 
         self.file_list = []
@@ -453,30 +454,44 @@ class AudioDataset(Dataset):
     def __getitem__(self, index):
         uttid, path = self.file_list[index]
 
-        # # ################# torchaudio / baseline
-        # # 加载wav文件
-        # wavform, _ = ta.load_wav(path)
-        # # 计算fbank特征
-        # feature = ta.compliance.kaldi.fbank(wavform, num_mel_bins=40)
-        # # 特征归一化
-        # mean = torch.mean(feature)
-        # std = torch.std(feature)
-        # feature = (feature - mean) / std
-        # # #################
+        feature = None
 
-        # ################## torchaudio + time wrap
-        AudioData = namedtuple('AudioData', ['sig', 'sr'])
-        spectro = SpecAugment.tfm_spectro(AudioData(*ta.load(path)), ws=512, hop=256, n_mels=args.input_size,
-                                          to_db_scale=True, f_max=8000, f_min=-80)
+        # fbank
+        if self.enhance_type == 'fbank':
+            # 加载wav文件
+            wavform, _ = ta.load_wav(path)
+            # 计算fbank特征
+            feature = ta.compliance.kaldi.fbank(wavform, num_mel_bins=40)
 
-        # 注意: F 和 T决定着裁减大小
-        feature = SpecAugment.time_mask(
-            SpecAugment.freq_mask(SpecAugment.time_warp(spectro, W=2), F=20, num_masks=2), T=4,
-            num_masks=2)
-        feature = torch.transpose(feature, 1, 2)
-        feature = feature.reshape(-1, args.input_size)
-        feature = (feature - torch.mean(feature)) / torch.std(feature)
-        # ################## torchaudio + time wrap
+        # mfcc + time warp
+        elif self.enhance_type == 'time_warp':
+            AudioData = namedtuple('AudioData', ['sig', 'sr'])
+            spectro = SpecAugment.tfm_spectro(AudioData(*ta.load(path)), ws=512, hop=256, n_mels=args.input_size,
+                                              to_db_scale=True, f_max=8000, f_min=-80)
+
+            # 注意: F 和 T决定着裁减大小
+            feature = SpecAugment.time_warp(spec=spectro, W=2)
+            feature = torch.transpose(feature, 1, 2)
+            feature = feature.reshape(-1, args.input_size)
+
+        # frequency mask
+        elif self.enhance_type == 'frequency_mask':
+            AudioData = namedtuple('AudioData', ['sig', 'sr'])
+            spectro = SpecAugment.tfm_spectro(AudioData(*ta.load(path)), ws=512, hop=256, n_mels=args.input_size,
+                                              to_db_scale=True, f_max=8000, f_min=-80)
+
+            feature = SpecAugment.freq_mask(spec=spectro, F=20, num_masks=2)
+            feature = torch.transpose(feature, 1, 2)
+            feature = feature.reshape(-1, args.input_size)
+
+        # mfcc + time mask
+        elif self.enhance_type == 'time_mask':
+            AudioData = namedtuple('AudioData', ['sig', 'sr'])
+            spectro = SpecAugment.tfm_spectro(AudioData(*ta.load(path)), ws=512, hop=256, n_mels=args.input_size,
+                                              to_db_scale=True, f_max=8000, f_min=-80)
+            feature = SpecAugment.time_mask(spec=spectro, T=8, num_masks=2)
+            feature = torch.transpose(feature, 1, 2)
+            feature = feature.reshape(-1, args.input_size)
 
         # ################# librosa
         # if args.using_mfcc:
@@ -494,6 +509,7 @@ class AudioDataset(Dataset):
         #     feature = torch.from_numpy(y_16k)
         #     feature = (feature - torch.mean(feature)) / torch.std(feature)
 
+        feature = (feature - torch.mean(feature)) / torch.std(feature)
         if self.targets_dict is not None:
             targets = self.targets_dict[uttid]
             return uttid, feature, targets
@@ -517,15 +533,14 @@ class AudioDataset(Dataset):
 
 
 if __name__ == '__main__':
-    pass
     # 处理训练集和验证集
-    # Util.deal_train_dev()
+    Util.deal_train_dev()
 
     # 处理测试集
-    # Util.deal_test()
+    Util.deal_test()
     #
     # 标准化训练和验证集
-    # Util.normal_train_dev()
+    Util.normal_train_dev()
 
     # 词表生成
-    # DataUtil().generate_vocab_table()
+    DataUtil().generate_vocab_table()
