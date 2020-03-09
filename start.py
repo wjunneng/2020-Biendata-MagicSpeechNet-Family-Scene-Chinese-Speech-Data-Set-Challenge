@@ -170,7 +170,7 @@ class Run(object):
 
 if __name__ == '__main__':
     start = time.clock()
-    Run().train()
+    # Run().train()
     current_time = time.clock()
     print('train using time: {}'.format(current_time - start))
     Run().predict()

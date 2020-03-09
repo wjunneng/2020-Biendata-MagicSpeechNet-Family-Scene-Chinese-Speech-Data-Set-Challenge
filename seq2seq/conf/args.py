@@ -69,8 +69,6 @@ vocab = {'<PAD>': 0, '<BOS>': 1, '<EOS>': 2, '<UNK>': 3}
 # 需要时刻注意是否更新
 vocab_size = 3864
 
-using_mfcc = False
-using_fbank = True
 seed = 42
 
 # 增强类型
@@ -82,7 +80,7 @@ enhance = {'0': 'fbank',
 
 # -* model arguments *-
 # 模型迭代次数
-total_epochs = 60
+total_epochs = 40
 # 模型维度
 model_size = 320
 # 注意力机制头数
@@ -102,13 +100,7 @@ lr_factor = 1.0
 # 梯度累计步数
 accu_grads_steps = 8
 
-if using_mfcc:
-    # 输入特征维度
-    input_size = 16
-    # 指定批大小 [batch:16->Global Step:1280]
-    batch_size = 96
-else:
-    # 输入特征维度
-    input_size = 40
-    # 指定批大小 [batch:16->Global Step:1280]
-    batch_size = 16
+# 输入特征维度
+input_size = 40
+# 指定批大小 [batch:16->Global Step:1280]
+batch_size = 16

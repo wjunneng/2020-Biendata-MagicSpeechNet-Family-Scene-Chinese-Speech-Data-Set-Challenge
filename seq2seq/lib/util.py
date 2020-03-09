@@ -17,7 +17,7 @@ from collections import namedtuple
 from torch.utils.data import Dataset
 
 from seq2seq.conf import args
-from seq2seq.lib.spec_augment import SpecAugment
+from seq2seq.lib import spec_augment
 
 os.chdir(sys.path[0])
 
@@ -461,16 +461,16 @@ class AudioDataset(Dataset):
             # 加载wav文件
             wavform, _ = ta.load_wav(path)
             # 计算fbank特征
-            feature = ta.compliance.kaldi.fbank(wavform, num_mel_bins=40)
+            feature = ta.compliance.kaldi.fbank(wavform, num_mel_bins=args.input_size)
 
         # mfcc + time warp
         elif self.enhance_type == 'time_warp':
             AudioData = namedtuple('AudioData', ['sig', 'sr'])
-            spectro = SpecAugment.tfm_spectro(AudioData(*ta.load(path)), ws=512, hop=256, n_mels=args.input_size,
+            spectro = spec_augment.tfm_spectro(AudioData(*ta.load(path)), ws=512, hop=256, n_mels=args.input_size,
                                               to_db_scale=True, f_max=8000, f_min=-80)
 
             # 注意: F 和 T决定着裁减大小
-            feature = SpecAugment.time_warp(spec=spectro, W=2)
+            feature = spec_augment.time_warp(spec=spectro, W=2)
             feature = torch.transpose(feature, 1, 2)
             feature = feature.reshape(-1, args.input_size)
 
@@ -480,7 +480,7 @@ class AudioDataset(Dataset):
             spectro = SpecAugment.tfm_spectro(AudioData(*ta.load(path)), ws=512, hop=256, n_mels=args.input_size,
                                               to_db_scale=True, f_max=8000, f_min=-80)
 
-            feature = SpecAugment.freq_mask(spec=spectro, F=20, num_masks=2)
+            feature = spec_augment.freq_mask(spec=spectro, F=20, num_masks=2)
             feature = torch.transpose(feature, 1, 2)
             feature = feature.reshape(-1, args.input_size)
 
@@ -489,7 +489,7 @@ class AudioDataset(Dataset):
             AudioData = namedtuple('AudioData', ['sig', 'sr'])
             spectro = SpecAugment.tfm_spectro(AudioData(*ta.load(path)), ws=512, hop=256, n_mels=args.input_size,
                                               to_db_scale=True, f_max=8000, f_min=-80)
-            feature = SpecAugment.time_mask(spec=spectro, T=8, num_masks=2)
+            feature = spec_augment.time_mask(spec=spectro, T=8, num_masks=2)
             feature = torch.transpose(feature, 1, 2)
             feature = feature.reshape(-1, args.input_size)
 
