@@ -1,5 +1,12 @@
+# -*- coding:utf-8 -*-
+import os
+import sys
+
+os.chdir(sys.path[0])
+
 import torch
 import numpy as np
+
 
 class Beam:
     r"""
@@ -26,8 +33,8 @@ class Beam:
 
     Examples::
 
-        >>> beam = Beam(k, decoder_hidden, decoder, batch_size, max_len, F.log_softmax)
-        >>> y_hats = beam.search(inputs, encoder_outputs)
+        > beam = Beam(k, decoder_hidden, decoder, batch_size, max_len, F.log_softmax)
+        > y_hats = beam.search(inputs, encoder_outputs)
     """
 
     def __init__(self, k, decoder_hidden, decoder, batch_size, max_len, function):
@@ -64,7 +71,7 @@ class Beam:
         decoder_input = self.beams
         # transpose (BxK) => (BxKx1)
         self.beams = self.beams.view(self.batch_size, self.k, 1)
-        for di in range(self.max_len-1):
+        for di in range(self.max_len - 1):
             if self._is_done():
                 break
             # For each beam, get class classfication distribution (shape: BxKxC)
@@ -73,9 +80,11 @@ class Beam:
             # get top k distribution (shape: BxKxK)
             child_ps, child_vs = step_output.topk(self.k)
             # get child probability (applying length penalty)
-            child_ps = (self.beam_scores.view(self.batch_size, 1, self.k) + child_ps) * self._get_length_penalty(length=di+1, alpha=1.2, min_length=5)
+            child_ps = (self.beam_scores.view(self.batch_size, 1, self.k) + child_ps) * self._get_length_penalty(
+                length=di + 1, alpha=1.2, min_length=5)
             # Transpose (BxKxK) => (BxK^2)
-            child_ps, child_vs = child_ps.view(self.batch_size, self.k * self.k), child_vs.view(self.batch_size, self.k * self.k)
+            child_ps, child_vs = child_ps.view(self.batch_size, self.k * self.k), child_vs.view(self.batch_size,
+                                                                                                self.k * self.k)
             # Select Top k in K^2 (shape: BxK)
             topk_child_ps, topk_child_indices = child_ps.topk(self.k)
             # Initiate topk_child_vs (shape: BxK)
@@ -146,7 +155,7 @@ class Beam:
         else:
             output = decoder_output
         predicted_softmax = self.function(self.out(output.contiguous().view(-1, self.hidden_size)), dim=1)
-        predicted_softmax = predicted_softmax.view(self.batch_size,output_size,-1)
+        predicted_softmax = predicted_softmax.view(self.batch_size, output_size, -1)
         return predicted_softmax
 
     def _get_length_penalty(self, length, alpha=1.2, min_length=5):
@@ -155,7 +164,7 @@ class Beam:
         because shorter sentence usually have bigger probability.
         using alpha = 1.2, min_length = 5 usually.
         """
-        return ((1+length) / (1+min_length)) ** alpha
+        return ((1 + length) / (1 + min_length)) ** alpha
 
     def _replace_beam(self, child_ps, child_vs, done_beam_index, count):
         """ Replaces a beam that ends with <eos> with a beam with the next higher probability. """

@@ -1,6 +1,13 @@
+# -*- coding:utf-8 -*-
+import os
+import sys
+
+os.chdir(sys.path[0])
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
 
 class Attention(nn.Module):
     r"""
@@ -27,12 +34,13 @@ class Attention(nn.Module):
 
     Examples::
 
-        >>> attention = Attention(hidden_size)
-        >>> output = attention(decoder_output, encoder_outputs)
+        > attention = Attention(hidden_size)
+        > output = attention(decoder_output, encoder_outputs)
     """
+
     def __init__(self, decoder_hidden_size):
         super(Attention, self).__init__()
-        self.w = nn.Linear(decoder_hidden_size*2, decoder_hidden_size)
+        self.w = nn.Linear(decoder_hidden_size * 2, decoder_hidden_size)
 
     def forward(self, decoder_output, encoder_outputs):
         batch_size = decoder_output.size(0)
@@ -48,4 +56,5 @@ class Attention(nn.Module):
         # concatenate attn_val & decoder_output
         combined = torch.cat((context, decoder_output), dim=2)
         output = torch.tanh(self.w(combined.view(-1, 2 * hidden_size))).view(batch_size, -1, hidden_size)
+
         return output
