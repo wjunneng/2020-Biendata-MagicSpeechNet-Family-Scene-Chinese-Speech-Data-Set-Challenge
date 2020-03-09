@@ -1,12 +1,24 @@
+# -*- coding:utf-8 -*-
+import os
+import sys
+
+os.chdir(sys.path[0])
+
 import time
-from listen_attend_spell.package.definition import logger, id2char, EOS_TOKEN
+import logging
+from listen_attend_spell.package.definition import id2char, EOS_TOKEN
 from listen_attend_spell.package.utils import get_distance, save_step_result
 
 train_step_result = {'loss': [], 'cer': []}
 
-def supervised_train(model, hparams, epoch, total_time_step, queue,
-          criterion, optimizer, device, train_begin, worker_num,
-          print_time_step=10, teacher_forcing_ratio=0.90):
+logger = logging.getLogger('root')
+FORMAT = "[%(asctime)s %(filename)s:%(lineno)s - %(funcName)s()] %(message)s"
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format=FORMAT)
+logger.setLevel(logging.INFO)
+
+
+def supervised_train(model, hparams, epoch, total_time_step, queue, criterion, optimizer, device, train_begin,
+                     worker_num, print_time_step=10, teacher_forcing_ratio=0.90):
     """
     Args:
         model (torch.nn.Module): Model to be trained
@@ -92,7 +104,9 @@ def supervised_train(model, hparams, epoch, total_time_step, queue,
     logger.info('train() completed')
     return loss, cer
 
+
 supervised_train.cumulative_batch_count = 0
+
 
 def ramp_up(optimizer, time_step, hparams):
     """
@@ -106,6 +120,7 @@ def ramp_up(optimizer, time_step, hparams):
     lr = hparams.high_plateau_lr * (time_step / 1000) ** power
     set_lr(optimizer, lr)
 
+
 def exp_decay(optimizer, total_time_step, hparams):
     """
     a gradual decrease in learning rates
@@ -115,14 +130,16 @@ def exp_decay(optimizer, total_time_step, hparams):
         https://github.com/DemisEom/SpecAugment/blob/master/SpecAugment/spec_augment_pytorch.py
     """
     decay_rate = hparams.low_plateau_lr / hparams.high_plateau_lr
-    decay_speed = decay_rate ** (1/total_time_step)
+    decay_speed = decay_rate ** (1 / total_time_step)
     lr = get_lr(optimizer)
     set_lr(optimizer, lr * decay_speed)
+
 
 def set_lr(optimizer, lr):
     """ set learning rate """
     for g in optimizer.param_groups:
         g['lr'] = lr
+
 
 def get_lr(optimizer):
     """ get learning rate """

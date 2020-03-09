@@ -1,7 +1,19 @@
+# -*- coding:utf-8 -*-
+import os
+import sys
+
+os.chdir(sys.path[0])
+
 import pandas as pd
 import pickle
 import Levenshtein as Lev
-from listen_attend_spell.package.definition import *
+
+import logging
+
+logger = logging.getLogger('root')
+FORMAT = "[%(asctime)s %(filename)s:%(lineno)s - %(funcName)s()] %(message)s"
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format=FORMAT)
+logger.setLevel(logging.INFO)
 
 
 def char_distance(target, y_hat):

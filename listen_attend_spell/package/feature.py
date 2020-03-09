@@ -1,8 +1,20 @@
+# -*- coding:utf-8 -*-
+import os
+import sys
+
+os.chdir(sys.path[0])
+
 import torch
 import librosa
 import numpy as np
 import random
-from listen_attend_spell.package.definition import logger
+
+import logging
+
+logger = logging.getLogger('root')
+FORMAT = "[%(asctime)s %(filename)s:%(lineno)s - %(funcName)s()] %(message)s"
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format=FORMAT)
+logger.setLevel(logging.INFO)
 
 
 def get_librosa_melspectrogram(filepath, n_mels=128, del_silence=False, input_reverse=True, mel_type='log_mel'):

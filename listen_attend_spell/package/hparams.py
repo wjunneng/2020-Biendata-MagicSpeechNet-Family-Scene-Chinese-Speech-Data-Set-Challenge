@@ -1,7 +1,18 @@
-from listen_attend_spell.package.definition import logger
+# -*- coding:utf-8 -*-
+import os
+import sys
+
+os.chdir(sys.path[0])
+
+import logging
+
+logger = logging.getLogger('root')
+FORMAT = "[%(asctime)s %(filename)s:%(lineno)s - %(funcName)s()] %(message)s"
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format=FORMAT)
+logger.setLevel(logging.INFO)
 
 
-class HyperParams():
+class HyperParams(object):
     """
     Hyperparameters
 

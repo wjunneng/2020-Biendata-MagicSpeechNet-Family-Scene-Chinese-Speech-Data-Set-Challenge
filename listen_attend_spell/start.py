@@ -30,6 +30,11 @@ Score:
 GitHub repository : https://github.com/sh951011/Korean-ASR
 Documentation : https://sh951011.github.io/Korean-Speech-Recognition/index.html
 """
+# -*- coding:utf-8 -*-
+import os
+import sys
+
+os.chdir(sys.path[0])
 
 import queue
 import torch.nn as nn
@@ -37,7 +42,6 @@ import torch.optim as optim
 import random
 import torch
 import time
-import os
 
 from listen_attend_spell.model.speller import Speller
 from listen_attend_spell.model.listener import Listener
@@ -51,6 +55,13 @@ from listen_attend_spell.package.loss import LabelSmoothingLoss
 from listen_attend_spell.package.trainer import supervised_train
 from listen_attend_spell.package.utils import save_epoch_result
 
+import logging
+
+logger = logging.getLogger('root')
+FORMAT = "[%(asctime)s %(filename)s:%(lineno)s - %(funcName)s()] %(message)s"
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format=FORMAT)
+logger.setLevel(logging.INFO)
+
 if torch.cuda.is_available():
     import torch.cuda as device
 else:
@@ -60,8 +71,8 @@ if __name__ == '__main__':
     os.environ["CUDA_LAUNCH_BLOCKING"] = "1"  # if you use Multi-GPU, delete this line
     logger.info("device : %s" % torch.cuda.get_device_name(0))
     logger.info("CUDA is available : %s" % (torch.cuda.is_available()))
-    logger.info("CUDA version : %s" % (torch.version.cuda))
-    logger.info("PyTorch version : %s" % (torch.__version__))
+    logger.info("CUDA version : %s" % torch.version.cuda)
+    logger.info("PyTorch version : %s" % torch.__version__)
 
     hparams = HyperParams()
 

@@ -1,6 +1,17 @@
+# -*- coding:utf-8 -*-
+import os
+import sys
+
+os.chdir(sys.path[0])
+
+import logging
 import torch
-from listen_attend_spell.package.definition import logger
 from listen_attend_spell.package.utils import get_distance
+
+logger = logging.getLogger('root')
+FORMAT = "[%(asctime)s %(filename)s:%(lineno)s - %(funcName)s()] %(message)s"
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format=FORMAT)
+logger.setLevel(logging.INFO)
 
 
 def evaluate(model, queue, criterion, device):
@@ -35,7 +46,7 @@ def evaluate(model, queue, criterion, device):
             target = scripts[:, 1:]
 
             model.module.flatten_parameters()
-            y_hat, logit = model(feats, scripts, teacher_forcing_ratio=0.0, use_beam_search = False)
+            y_hat, logit = model(feats, scripts, teacher_forcing_ratio=0.0, use_beam_search=False)
             loss = criterion(logit.contiguous().view(-1, logit.size(-1)), target.contiguous().view(-1))
             total_loss += loss.item()
             total_num += sum(feat_lengths)

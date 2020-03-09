@@ -1,5 +1,18 @@
+# -*- coding:utf-8 -*-
+import os
+import sys
+
+os.chdir(sys.path[0])
+
 import torch
 import torch.nn as nn
+import logging
+
+logger = logging.getLogger('root')
+FORMAT = "[%(asctime)s %(filename)s:%(lineno)s - %(funcName)s()] %(message)s"
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format=FORMAT)
+logger.setLevel(logging.INFO)
+
 
 class LabelSmoothingLoss(nn.Module):
     """
@@ -19,6 +32,7 @@ class LabelSmoothingLoss(nn.Module):
     Reference:
         https://github.com/pytorch/pytorch/issues/7455
     """
+
     def __init__(self, vocab_size, ignore_index, smoothing=0.1, dim=-1):
         super(LabelSmoothingLoss, self).__init__()
         self.confidence = 1.0 - smoothing

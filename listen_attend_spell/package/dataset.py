@@ -1,9 +1,22 @@
+# -*- coding:utf-8 -*-
+import os
+import sys
+
+os.chdir(sys.path[0])
+
 import math
 import random
 from torch.utils.data import Dataset
-from listen_attend_spell.package.definition import EOS_TOKEN, logger, SOS_TOKEN
+from listen_attend_spell.package.definition import EOS_TOKEN, SOS_TOKEN
 from listen_attend_spell.package.feature import spec_augment, get_librosa_melspectrogram
 from listen_attend_spell.package.utils import get_label
+
+import logging
+
+logger = logging.getLogger('root')
+FORMAT = "[%(asctime)s %(filename)s:%(lineno)s - %(funcName)s()] %(message)s"
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format=FORMAT)
+logger.setLevel(logging.INFO)
 
 
 class BaseDataset(Dataset):
@@ -22,9 +35,10 @@ class BaseDataset(Dataset):
         pack_by_length (bool): pack by similar sequence length
         batch_size (int): mini batch size
     """
-    def __init__(self, audio_paths, label_paths, sos_id = 2037, eos_id = 2038,
-                 target_dict = None, input_reverse = True, use_augment = True,
-                 batch_size = None, augment_ratio = 0.3, pack_by_length = True):
+
+    def __init__(self, audio_paths, label_paths, sos_id=2037, eos_id=2038,
+                 target_dict=None, input_reverse=True, use_augment=True,
+                 batch_size=None, augment_ratio=0.3, pack_by_length=True):
         self.audio_paths = list(audio_paths)
         self.label_paths = list(label_paths)
         self.sos_id = sos_id
@@ -53,7 +67,8 @@ class BaseDataset(Dataset):
 
     def get_item(self, idx):
         label = get_label(self.label_paths[idx], sos_id=self.sos_id, eos_id=self.eos_id, target_dict=self.target_dict)
-        feat = get_librosa_melspectrogram(self.audio_paths[idx], n_mels=128, mel_type='log_mel', input_reverse=self.input_reverse)
+        feat = get_librosa_melspectrogram(self.audio_paths[idx], n_mels=128, mel_type='log_mel',
+                                          input_reverse=self.input_reverse)
         # exception handling
         if feat is None:
             return None, None
@@ -90,8 +105,7 @@ class BaseDataset(Dataset):
         bundle = list(zip(target_lengths, self.audio_paths, self.label_paths, self.augment_flags))
         _, self.audio_paths, self.label_paths, self.augment_flags = zip(*sorted(bundle, reverse=True))
 
-
-    def batch_shuffle(self, remain_drop = False):
+    def batch_shuffle(self, remain_drop=False):
         """ batch shuffle """
         audio_batches, label_batches, flag_batches = [], [], []
         tmp_audio_paths, tmp_label_paths, tmp_augment_flags = [], [], []
@@ -140,7 +154,7 @@ class BaseDataset(Dataset):
         return audio_paths, label_paths, augment_flags
 
 
-def split_dataset(hparams, audio_paths, label_paths, valid_ratio=0.05, target_dict = None):
+def split_dataset(hparams, audio_paths, label_paths, valid_ratio=0.05, target_dict=None):
     """
     Dataset split into training and validation Dataset.
 
@@ -162,7 +176,7 @@ def split_dataset(hparams, audio_paths, label_paths, valid_ratio=0.05, target_di
     valid_time_step = math.ceil(total_time_step * valid_ratio)
     train_time_step = total_time_step - valid_time_step
     if hparams.use_augment:
-        train_time_step = int( train_time_step * (1 + hparams.augment_ratio))
+        train_time_step = int(train_time_step * (1 + hparams.augment_ratio))
     train_num_per_worker = math.ceil(train_num / hparams.worker_num)
 
     # audio_paths & label_paths shuffled in the same order
@@ -176,27 +190,27 @@ def split_dataset(hparams, audio_paths, label_paths, valid_ratio=0.05, target_di
         train_begin_index = train_num_per_worker * idx
         train_end_index = min(train_num_per_worker * (idx + 1), train_num)
         train_dataset_list.append(BaseDataset(
-                                    audio_paths=audio_paths[train_begin_index:train_end_index],
-                                    label_paths=label_paths[train_begin_index:train_end_index],
-                                    sos_id=SOS_TOKEN, eos_id=EOS_TOKEN,
-                                    target_dict=target_dict,
-                                    input_reverse=hparams.input_reverse,
-                                    use_augment=hparams.use_augment,
-                                    batch_size=hparams.batch_size,
-                                    augment_ratio=hparams.augment_ratio,
-                                    pack_by_length=hparams.pack_by_length
-                                )
+            audio_paths=audio_paths[train_begin_index:train_end_index],
+            label_paths=label_paths[train_begin_index:train_end_index],
+            sos_id=SOS_TOKEN, eos_id=EOS_TOKEN,
+            target_dict=target_dict,
+            input_reverse=hparams.input_reverse,
+            use_augment=hparams.use_augment,
+            batch_size=hparams.batch_size,
+            augment_ratio=hparams.augment_ratio,
+            pack_by_length=hparams.pack_by_length
+        )
         )
 
     valid_dataset = BaseDataset(
-                        audio_paths=audio_paths[train_num:],
-                        label_paths=label_paths[train_num:],
-                        sos_id=SOS_TOKEN, eos_id=EOS_TOKEN,
-                        batch_size=hparams.batch_size,
-                        target_dict=target_dict,
-                        input_reverse=hparams.input_reverse,
-                        use_augment=False,
-                        pack_by_length=hparams.pack_by_length
+        audio_paths=audio_paths[train_num:],
+        label_paths=label_paths[train_num:],
+        sos_id=SOS_TOKEN, eos_id=EOS_TOKEN,
+        batch_size=hparams.batch_size,
+        target_dict=target_dict,
+        input_reverse=hparams.input_reverse,
+        use_augment=False,
+        pack_by_length=hparams.pack_by_length
     )
 
     logger.info("split dataset complete !!")

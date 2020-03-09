@@ -1,3 +1,9 @@
+# -*- coding:utf-8 -*-
+import os
+import sys
+
+os.chdir(sys.path[0])
+
 import csv
 import pickle
 import torch
@@ -6,11 +12,17 @@ import math
 import random
 import pandas as pd
 from tqdm import trange
-from listen_attend_spell.package.definition import logger, PAD_TOKEN
 from listen_attend_spell.package.utils import save_pickle
 
+import logging
 
-class MultiLoader():
+logger = logging.getLogger('root')
+FORMAT = "[%(asctime)s %(filename)s:%(lineno)s - %(funcName)s()] %(message)s"
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format=FORMAT)
+logger.setLevel(logging.INFO)
+
+
+class MultiLoader(object):
     """
     Multi Data Loader using Threads.
 
@@ -20,6 +32,7 @@ class MultiLoader():
         batch_size (int): size of batch
         worker_num (int): the number of cpu cores used
     """
+
     def __init__(self, dataset_list, queue, batch_size, worker_num):
         self.dataset_list = dataset_list
         self.queue = queue
@@ -49,6 +62,7 @@ class BaseDataLoader(threading.Thread):
         batch_size (int): size of batch
         thread_id (int): identification of thread
     """
+
     def __init__(self, dataset, queue, batch_size, thread_id):
         threading.Thread.__init__(self)
         self.collate_fn = _collate_fn
@@ -92,8 +106,10 @@ class BaseDataLoader(threading.Thread):
             self.queue.put(batch)
         logger.debug('loader %d stop' % (self.thread_id))
 
+
 def _collate_fn(batch):
     """ functions that pad to the maximum sequence length """
+
     def seq_length_(p):
         return len(p[0])
 
@@ -159,7 +175,7 @@ def load_data_list(data_list_path, dataset_path):
         - **audio_paths** (list): set of audio path
         - **label_paths** (list): set of label path
     """
-    data_list = pd.read_csv(data_list_path, "r", delimiter = ",", encoding="cp949")
+    data_list = pd.read_csv(data_list_path, "r", delimiter=",", encoding="cp949")
     audio_paths = list(dataset_path + data_list["audio"])
     label_paths = list(dataset_path + data_list["label"])
 
@@ -171,7 +187,7 @@ def load_label(label_path, encoding='utf-8'):
     Provides char2id, id2char
 
     Args:
-        label_path (list): csv file with character labels
+        label_path (str): csv file with character labels
 
     Returns: char2id, id2char
         - **char2id** (dict): char2id[ch] = id
@@ -179,13 +195,12 @@ def load_label(label_path, encoding='utf-8'):
     """
     char2id = dict()
     id2char = dict()
-    with open(label_path, 'r', encoding=encoding) as f:
-        labels = csv.reader(f, delimiter=',')
-        next(labels)
+    with open(label_path, mode='r', encoding=encoding) as f:
+        labels = csv.reader(f, delimiter=' ')
 
         for row in labels:
-            char2id[row[1]] = row[0]
-            id2char[int(row[0])] = row[1]
+            char2id[row[0]] = int(row[1])
+            id2char[int(row[1])] = row[0]
 
     return char2id, id2char
 
