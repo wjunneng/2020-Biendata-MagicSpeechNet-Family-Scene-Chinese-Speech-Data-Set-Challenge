@@ -68,14 +68,8 @@ if torch.cuda.is_available():
 else:
     import torch as device
 
-if __name__ == '__main__':
-    # if you use Multi-GPU, delete this line
-    os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
-    logger.info("device : %s" % torch.cuda.get_device_name(0))
-    logger.info("CUDA is available : %s" % (torch.cuda.is_available()))
-    logger.info("CUDA version : %s" % torch.version.cuda)
-    logger.info("PyTorch version : %s" % torch.__version__)
 
+def train():
     hparams = HyperParams()
 
     random.seed(hparams.seed)
@@ -189,3 +183,76 @@ if __name__ == '__main__':
         save_epoch_result(train_result=[args.train_dict, train_loss],
                           valid_result=[args.valid_dict, valid_loss, valid_cer])
         logger.info('Epoch %d Training result saved as a csv file complete !!' % epoch)
+
+
+# def predict():
+#     """ Test for Model Performance """
+#     hparams = HyperParams()
+#     hparams.logger_hparams()
+#     cuda = hparams.use_cuda and torch.cuda.is_available()
+#     device = torch.device('cuda' if cuda else 'cpu')
+#     model = torch.load("model_path")
+#     model.set_beam_size(k=8)
+#
+#     audio_paths, label_paths = load_data_list(data_list_path=TEST_LIST_PATH, dataset_path=DATASET_PATH)
+#
+#     target_dict = load_targets(label_paths)
+#     logger.info('start')
+#
+#     test_dataset = BaseDataset(
+#         audio_paths=audio_paths[:],
+#         label_paths=label_paths[:],
+#         sos_id=SOS_TOKEN,
+#         eos_id=EOS_TOKEN,
+#         target_dict=target_dict,
+#         input_reverse=hparams.input_reverse,
+#         use_augment=False
+#     )
+#
+#     test_queue = queue.Queue(hparams.worker_num << 1)
+#     test_loader = BaseDataLoader(test_dataset, test_queue, hparams.batch_size, 0)
+#     test_loader.start()
+#
+#     logger.info('evaluate() start')
+#     total_distance = 0
+#     total_length = 0
+#     total_sent_num = 0
+#
+#     model.eval()
+#
+#     with torch.no_grad():
+#         while True:
+#             feats, targets, feat_lengths, script_lengths = queue.get()
+#             if feats.shape[0] == 0:
+#                 break
+#
+#             feats = feats.to(device)
+#             targets = targets.to(device)
+#             target = targets[:, 1:]
+#
+#             model.module.flatten_parameters()
+#             y_hat, _ = model(
+#                 feats=feats,
+#                 targets=targets,
+#                 teacher_forcing_ratio=0.0,
+#                 use_beam_search=True
+#             )
+#             distance, length = get_distance(target, y_hat, id2char, EOS_TOKEN)
+#             total_distance += distance
+#             total_length += length
+#             total_sent_num += target.size(0)
+#
+#     CER = total_distance / total_length
+#     logger.info('test() completed')
+#     return CER
+
+
+if __name__ == '__main__':
+    # if you use Multi-GPU, delete this line
+    os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
+    logger.info("device : %s" % torch.cuda.get_device_name(0))
+    logger.info("CUDA is available : %s" % (torch.cuda.is_available()))
+    logger.info("CUDA version : %s" % torch.version.cuda)
+    logger.info("PyTorch version : %s" % torch.__version__)
+
+    train()

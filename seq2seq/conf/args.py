@@ -61,6 +61,7 @@ data_model_dir = os.path.join(data_dir, 'model')
 data_reault_path = os.path.join(data_dir, 'result.csv')
 sample_submission_path = os.path.join(magicdata_dir, 'sample_submission.csv')
 data_submission_path = os.path.join(data_dir, 'submission.csv')
+data_pre_submission_path = os.path.join(data_dir, 'pre_submission.csv')
 
 vocab_path = os.path.join(data_dir, 'vocab.txt')
 vocab = {'<PAD>': 0, '<BOS>': 1, '<EOS>': 2, '<UNK>': 3}
@@ -117,9 +118,9 @@ lr_factor = 1.0
 accu_grads_steps = 8
 
 # 输入特征维度
-input_size = 40
+input_size = 128
 # 指定批大小 [batch:16->Global Step:1280]
-batch_size = 16
+batch_size = 8
 N_FFT = 512
 use_mel_scale = True
 use_specaug = False

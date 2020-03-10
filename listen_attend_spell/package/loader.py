@@ -150,7 +150,7 @@ def load_data_list(wav_path, text_path, vocab_dict):
 
     Args:
         wav_path (str): csv file with training or test data list
-        text_path (str): txt file with training or test data list
+        text_path (None | str): txt file with training or test data list
 
     Returns: audio_paths, label_paths
         - **audio_paths** (list): set of audio path
@@ -160,15 +160,18 @@ def load_data_list(wav_path, text_path, vocab_dict):
     uttid_audio = dict(zip(uttid_audio[0], uttid_audio[1]))
 
     utt_ids, audio_paths, label_texts = [], [], []
-    with open(text_path, encoding='utf-8', mode='r') as file:
-        for line in file.readlines():
-            line = line.strip('\n').split(' ')
-            id = line[0]
-            utt_ids.append(id)
-            label_texts.append([vocab_dict[i] if i in vocab_dict else vocab_dict['<UNK>'] for i in line[1:]])
-            audio_paths.append(uttid_audio[id])
+    if text_path is not None:
+        with open(text_path, encoding='utf-8', mode='r') as file:
+            for line in file.readlines():
+                line = line.strip('\n').split(' ')
+                id = line[0]
+                utt_ids.append(id)
+                label_texts.append([vocab_dict[i] if i in vocab_dict else vocab_dict['<UNK>'] for i in line[1:]])
+                audio_paths.append(uttid_audio[id])
 
-    return utt_ids, audio_paths, label_texts
+        return utt_ids, audio_paths, label_texts
+    else:
+        return uttid_audio.keys(), uttid_audio.values()
 
 
 def load_label(label_path, encoding='utf-8'):

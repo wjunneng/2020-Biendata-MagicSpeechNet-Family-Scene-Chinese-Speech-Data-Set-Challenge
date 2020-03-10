@@ -333,6 +333,25 @@ class Util(object):
         print(sample_submission)
 
     @staticmethod
+    def preprocessing_result():
+        data_submission_path = args.data_submission_path
+        sample_submission = pd.read_csv(data_submission_path)
+
+        words = []
+        for word in sample_submission['words']:
+            str = word
+            if len(word) > 2:
+                str = word[:2]
+                for index in range(2, len(word)):
+                    if len(set(word[index - 2:index])) == 1:
+                        continue
+                    else:
+                        str += word[index]
+            words.append(str)
+        sample_submission['words'] = words
+        sample_submission.to_csv(args.data_pre_submission_path, index=None)
+
+    @staticmethod
     def trim(data, cfg_trim):
         threshold_attack = cfg_trim["threshold_attack"]
         threshold_release = cfg_trim["threshold_release"]
@@ -592,14 +611,17 @@ class AudioDataset(Dataset):
 
 
 if __name__ == '__main__':
-    # 处理训练集和验证集
-    Util.deal_train_dev()
-
-    # 处理测试集
-    Util.deal_test()
+    # # 处理训练集和验证集
+    # Util.deal_train_dev()
     #
-    # 标准化训练和验证集
-    Util.normal_train_dev()
+    # # 处理测试集
+    # Util.deal_test()
+    # #
+    # # 标准化训练和验证集
+    # Util.normal_train_dev()
+    #
+    # # 词表生成
+    # DataUtil().generate_vocab_table()
 
-    # 词表生成
-    DataUtil().generate_vocab_table()
+    # 后处理
+    Util.preprocessing_result()
