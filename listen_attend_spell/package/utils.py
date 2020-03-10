@@ -8,6 +8,7 @@ import pandas as pd
 import pickle
 import Levenshtein as Lev
 
+from listen_attend_spell.package import args
 import logging
 
 logger = logging.getLogger('root')
@@ -62,24 +63,18 @@ def get_distance(targets, y_hats, id2char, eos_id):
     return total_distance, total_length
 
 
-def get_label(filepath, sos_id, eos_id, target_dict=None):
+def get_label(tokens, sos_id, eos_id):
     """
     Provides specific file`s label to list format.
 
     Args:
-        filepath (str): specific path of label file
+        tokens (str): specific path of label file
         bos_id (int): identification of <start of sequence>
         eos_id (int): identification of <end of sequence>
-        target_dict (dict): dictionary of filename and labels
 
     Returns: label
         - **label** (list): list of bos + sequence of label + eos
     """
-    assert target_dict is not None, "target_dict is None"
-    key = filepath.split('/')[-1].split('.')[0]
-    script = target_dict[key]
-    tokens = script.split(' ')
-
     label = list()
     label.append(int(sos_id))
     for token in tokens:
@@ -122,25 +117,15 @@ def label_to_string(labels, id2char, eos_id):
 
 def save_epoch_result(train_result, valid_result):
     """ save result of training (unit : epoch) """
-    train_dict, train_loss, train_cer = train_result
-    valid_dict, valid_loss, valid_cer = valid_result
+    train_dict, train_loss = train_result
+    valid_dict, valid_loss = valid_result
     train_dict["loss"].append(train_loss)
-    train_dict["cer"].append(train_cer)
     valid_dict["loss"].append(valid_loss)
-    valid_dict["cer"].append(valid_cer)
 
     train_df = pd.DataFrame(train_dict)
     valid_df = pd.DataFrame(valid_dict)
-    train_df.to_csv(TRAIN_RESULT_PATH, encoding="cp949", index=False)
-    valid_df.to_csv(VALID_RESULT_PATH, encoding="cp949", index=False)
-
-
-def save_step_result(train_step_result, loss, cer):
-    """ save result of training (unit : K time step) """
-    train_step_result["loss"].append(loss)
-    train_step_result["cer"].append(cer)
-    train_step_df = pd.DataFrame(train_step_result)
-    train_step_df.to_csv(TRAIN_STEP_RESULT_PATH, encoding="cp949", index=False)
+    train_df.to_csv(args.data_train_result_path, encoding="utf-8", index=False)
+    valid_df.to_csv(args.data_dev_result_path, encoding="utf-8", index=False)
 
 
 def save_pickle(save_var, savepath, message=""):

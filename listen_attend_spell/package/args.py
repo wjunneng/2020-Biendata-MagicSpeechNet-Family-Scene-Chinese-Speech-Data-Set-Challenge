@@ -61,6 +61,8 @@ data_model_dir = os.path.join(data_dir, 'model')
 # -* result *-
 # data result path
 data_reault_path = os.path.join(data_dir, 'result.csv')
+data_train_result_path = os.path.join(data_dir, 'train_result.csv')
+data_dev_result_path = os.path.join(data_dir, 'dev_result.csv')
 sample_submission_path = os.path.join(magicdata_dir, 'sample_submission.csv')
 data_submission_path = os.path.join(data_dir, 'submission.csv')
 vocab_path = os.path.join(data_dir, 'vocab.txt')
@@ -73,3 +75,5 @@ EOS_TOKEN = int(char2id['<EOS>'])
 PAD_TOKEN = int(char2id['<PAD>'])
 train_dict = {'loss': [], 'cer': []}
 valid_dict = {'loss': [], 'cer': []}
+
+input_dim = 48

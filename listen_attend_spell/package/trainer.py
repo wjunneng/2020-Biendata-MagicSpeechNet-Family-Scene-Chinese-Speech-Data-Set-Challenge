@@ -6,8 +6,8 @@ os.chdir(sys.path[0])
 
 import time
 import logging
-from listen_attend_spell.package.definition import id2char, EOS_TOKEN
-from listen_attend_spell.package.utils import get_distance, save_step_result
+from listen_attend_spell.package.args import id2char, EOS_TOKEN
+from listen_attend_spell.package.utils import get_distance
 
 train_step_result = {'loss': [], 'cer': []}
 
@@ -36,7 +36,6 @@ def supervised_train(model, hparams, epoch, total_time_step, queue, criterion, o
     """
     total_loss = 0.
     total_num = 0
-    total_distance = 0
     total_length = 0
     total_sent_num = 0
     time_step = 0
@@ -53,12 +52,13 @@ def supervised_train(model, hparams, epoch, total_time_step, queue, criterion, o
         if feats.shape[0] == 0:
             # empty feats means closing one loader
             worker_num -= 1
-            logger.debug('left train_loader: %d' % (worker_num))
+            logger.debug('left train_loader: %d' % worker_num)
 
             if worker_num == 0:
                 break
             else:
                 continue
+
         optimizer.zero_grad()
 
         feats = feats.to(device)
@@ -72,7 +72,6 @@ def supervised_train(model, hparams, epoch, total_time_step, queue, criterion, o
         total_loss += loss.item()
         total_num += sum(feat_lengths)
         distance, length = get_distance(target, y_hat, id2char, EOS_TOKEN)
-        total_distance += distance
         total_length += length
         total_sent_num += target.size(0)
         loss.backward()
@@ -84,25 +83,21 @@ def supervised_train(model, hparams, epoch, total_time_step, queue, criterion, o
             epoch_elapsed = (current - epoch_begin) / 60.0
             train_elapsed = (current - train_begin) / 3600.0
 
-            logger.info('timestep: {:4d}/{:4d}, loss: {:.4f}, cer: {:.2f}, elapsed: {:.2f}s {:.2f}m {:.2f}h'.format(
+            logger.info('timestep: {:4d}/{:4d}, loss: {:.4f}, elapsed: {:.2f}s {:.2f}m {:.2f}h'.format(
                 time_step,
                 total_time_step,
                 total_loss / total_num,
-                total_distance / total_length,
                 elapsed, epoch_elapsed, train_elapsed)
             )
             begin = time.time()
-
-        if time_step % 1000 == 0:
-            save_step_result(train_step_result, total_loss / total_num, total_distance / total_length)
 
         time_step += 1
         supervised_train.cumulative_batch_count += 1
 
     loss = total_loss / total_num
-    cer = total_distance / total_length
     logger.info('train() completed')
-    return loss, cer
+
+    return loss
 
 
 supervised_train.cumulative_batch_count = 0

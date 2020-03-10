@@ -4,12 +4,11 @@ import sys
 
 os.chdir(sys.path[0])
 
-import math
 import random
 from torch.utils.data import Dataset
-from listen_attend_spell.package.definition import EOS_TOKEN, SOS_TOKEN
 from listen_attend_spell.package.feature import spec_augment, get_librosa_melspectrogram
 from listen_attend_spell.package.utils import get_label
+from listen_attend_spell.package import args
 
 import logging
 
@@ -36,15 +35,13 @@ class BaseDataset(Dataset):
         batch_size (int): mini batch size
     """
 
-    def __init__(self, audio_paths, label_paths, sos_id=2037, eos_id=2038,
-                 target_dict=None, input_reverse=True, use_augment=True,
-                 batch_size=None, augment_ratio=0.3, pack_by_length=True):
+    def __init__(self, audio_paths, label_paths, input_reverse=True, use_augment=True, batch_size=None,
+                 augment_ratio=0.3, pack_by_length=True):
         self.audio_paths = list(audio_paths)
         self.label_paths = list(label_paths)
-        self.sos_id = sos_id
-        self.eos_id = eos_id
+        self.sos_id = args.SOS_TOKEN
+        self.eos_id = args.EOS_TOKEN
         self.batch_size = batch_size
-        self.target_dict = target_dict
         self.input_reverse = input_reverse
         self.augment_ratio = augment_ratio
         self.augment_flags = [False] * len(self.audio_paths)
@@ -66,14 +63,14 @@ class BaseDataset(Dataset):
         return len(self.audio_paths)
 
     def get_item(self, idx):
-        label = get_label(self.label_paths[idx], sos_id=self.sos_id, eos_id=self.eos_id, target_dict=self.target_dict)
-        feat = get_librosa_melspectrogram(self.audio_paths[idx], n_mels=128, mel_type='log_mel',
+        label = get_label(self.label_paths[idx], sos_id=self.sos_id, eos_id=self.eos_id)
+        feat = get_librosa_melspectrogram(self.audio_paths[idx], n_mels=args.input_dim, mel_type='log_mel',
                                           input_reverse=self.input_reverse)
         # exception handling
         if feat is None:
             return None, None
         if self.augment_flags[idx]:
-            feat = spec_augment(feat, T=70, F=20, time_mask_num=2, freq_mask_num=2)
+            feat = spec_augment(feat, T=8, F=20, time_mask_num=2, freq_mask_num=2)
         return feat, label
 
     def augmentation(self):
@@ -152,66 +149,3 @@ class BaseDataset(Dataset):
             augment_flags.extend(remain_flag)
 
         return audio_paths, label_paths, augment_flags
-
-
-def split_dataset(hparams, audio_paths, label_paths, valid_ratio=0.05, target_dict=None):
-    """
-    Dataset split into training and validation Dataset.
-
-    Args:
-        hparams (package.hparams.HyperParams): set of hyper parameters
-        audio_paths (list): set of audio path
-        label_paths (list): set of label path
-        target_dict (dict): dictionary of filename and target
-
-    Returns: train_batch_num, train_dataset_list, valid_dataset
-        - **train_batch_num** (int): num of batch for training
-        - **train_dataset_list** (list): list of training dataset
-        - **valid_dataset** (utils.dataset.BaseDataset): validation dataset
-    """
-    logger.info("split dataset start !!")
-    train_dataset_list = list()
-    train_num = math.ceil(len(audio_paths) * (1 - valid_ratio))
-    total_time_step = math.ceil(len(audio_paths) / hparams.batch_size)
-    valid_time_step = math.ceil(total_time_step * valid_ratio)
-    train_time_step = total_time_step - valid_time_step
-    if hparams.use_augment:
-        train_time_step = int(train_time_step * (1 + hparams.augment_ratio))
-    train_num_per_worker = math.ceil(train_num / hparams.worker_num)
-
-    # audio_paths & label_paths shuffled in the same order
-    # for seperating train & validation
-    data_paths = list(zip(audio_paths, label_paths))
-    random.shuffle(data_paths)
-    audio_paths, label_paths = zip(*data_paths)
-
-    # seperating the train dataset by the number of workers
-    for idx in range(hparams.worker_num):
-        train_begin_index = train_num_per_worker * idx
-        train_end_index = min(train_num_per_worker * (idx + 1), train_num)
-        train_dataset_list.append(BaseDataset(
-            audio_paths=audio_paths[train_begin_index:train_end_index],
-            label_paths=label_paths[train_begin_index:train_end_index],
-            sos_id=SOS_TOKEN, eos_id=EOS_TOKEN,
-            target_dict=target_dict,
-            input_reverse=hparams.input_reverse,
-            use_augment=hparams.use_augment,
-            batch_size=hparams.batch_size,
-            augment_ratio=hparams.augment_ratio,
-            pack_by_length=hparams.pack_by_length
-        )
-        )
-
-    valid_dataset = BaseDataset(
-        audio_paths=audio_paths[train_num:],
-        label_paths=label_paths[train_num:],
-        sos_id=SOS_TOKEN, eos_id=EOS_TOKEN,
-        batch_size=hparams.batch_size,
-        target_dict=target_dict,
-        input_reverse=hparams.input_reverse,
-        use_augment=False,
-        pack_by_length=hparams.pack_by_length
-    )
-
-    logger.info("split dataset complete !!")
-    return train_time_step, train_dataset_list, valid_dataset

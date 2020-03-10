@@ -12,7 +12,8 @@ import math
 import random
 import pandas as pd
 from tqdm import trange
-from listen_attend_spell.package.utils import save_pickle
+
+from listen_attend_spell.package import args
 
 import logging
 
@@ -104,7 +105,7 @@ class BaseDataLoader(threading.Thread):
 
             batch = self.collate_fn(items)
             self.queue.put(batch)
-        logger.debug('loader %d stop' % (self.thread_id))
+        logger.debug('loader %d stop' % self.thread_id)
 
 
 def _collate_fn(batch):
@@ -131,7 +132,7 @@ def _collate_fn(batch):
     seqs = torch.zeros(batch_size, max_seq_size, feat_size)
 
     targets = torch.zeros(batch_size, max_target_size).to(torch.long)
-    targets.fill_(PAD_TOKEN)
+    targets.fill_(args.PAD_TOKEN)
 
     for x in range(batch_size):
         sample = batch[x]
@@ -143,43 +144,31 @@ def _collate_fn(batch):
     return seqs, targets, seq_lengths, target_lengths
 
 
-def load_targets(label_paths):
-    """
-    Provides dictionary of filename and labels
-
-    Args:
-        label_paths (list): set of label paths
-
-    Returns: target_dict
-        - **target_dict** (dict): dictionary of filename and labels
-    """
-    target_dict = dict()
-    for idx in trange(len(label_paths)):
-        label_txt = label_paths[idx]
-        with open(file=label_txt, mode="r") as f:
-            label = f.readline()
-            file_num = label_txt.split('/')[-1].split('.')[0].split('_')[-1]
-            target_dict['KaiSpeech_label_%s' % file_num] = label
-    save_pickle(target_dict, "./data/pickle/target_dict.bin", message="target_dict save complete !!")
-    return target_dict
-
-
-def load_data_list(data_list_path, dataset_path):
+def load_data_list(wav_path, text_path, vocab_dict):
     """
     Provides set of audio path & label path
 
     Args:
-        data_list_path (list): csv file with training or test data list
+        wav_path (str): csv file with training or test data list
+        text_path (str): txt file with training or test data list
 
     Returns: audio_paths, label_paths
         - **audio_paths** (list): set of audio path
         - **label_paths** (list): set of label path
     """
-    data_list = pd.read_csv(data_list_path, "r", delimiter=",", encoding="cp949")
-    audio_paths = list(dataset_path + data_list["audio"])
-    label_paths = list(dataset_path + data_list["label"])
+    uttid_audio = pd.read_csv(wav_path, "r", delimiter=" ", encoding="utf-8", header=None)
+    uttid_audio = dict(zip(uttid_audio[0], uttid_audio[1]))
 
-    return audio_paths, label_paths
+    utt_ids, audio_paths, label_texts = [], [], []
+    with open(text_path, encoding='utf-8', mode='r') as file:
+        for line in file.readlines():
+            line = line.strip('\n').split(' ')
+            id = line[0]
+            utt_ids.append(id)
+            label_texts.append([vocab_dict[i] if i in vocab_dict else vocab_dict['<UNK>'] for i in line[1:]])
+            audio_paths.append(uttid_audio[id])
+
+    return utt_ids, audio_paths, label_texts
 
 
 def load_label(label_path, encoding='utf-8'):

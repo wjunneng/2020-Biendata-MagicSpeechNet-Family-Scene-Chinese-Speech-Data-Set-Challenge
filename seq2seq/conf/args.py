@@ -70,10 +70,28 @@ vocab_size = 3864
 seed = 42
 
 # 增强类型
-enhance = {'0': 'fbank',
-           '9': 'time_warp',
-           '8': 'frequency_mask',
-           '7': 'time_mask'
+# enhance = {'0': 'fbank',
+#            '1': 'freq_mask_time_mask',
+#            '2': 'fbank',
+#            '3': 'freq_mask_time_mask',
+#            '4': 'fbank',
+#            '5': 'freq_mask_time_mask',
+#            '6': 'fbank',
+#            '7': 'freq_mask_time_mask',
+#            '8': 'fbank',
+#            '9': 'freq_mask_time_mask',
+#            }
+
+enhance = {'0': 'freq_mask_time_mask',
+           '1': 'freq_mask_time_mask',
+           '2': 'freq_mask_time_mask',
+           '3': 'freq_mask_time_mask',
+           '4': 'freq_mask_time_mask',
+           '5': 'freq_mask_time_mask',
+           '6': 'freq_mask_time_mask',
+           '7': 'freq_mask_time_mask',
+           '8': 'freq_mask_time_mask',
+           '9': 'freq_mask_time_mask',
            }
 
 # -* model arguments *-
@@ -102,3 +120,6 @@ accu_grads_steps = 8
 input_size = 40
 # 指定批大小 [batch:16->Global Step:1280]
 batch_size = 16
+N_FFT = 512
+use_mel_scale = True
+use_specaug = False

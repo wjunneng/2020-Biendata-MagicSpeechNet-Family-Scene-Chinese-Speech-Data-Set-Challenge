@@ -7,6 +7,7 @@ os.chdir(sys.path[0])
 import logging
 import torch
 from listen_attend_spell.package.utils import get_distance
+from listen_attend_spell.package.args import id2char, EOS_TOKEN
 
 logger = logging.getLogger('root')
 FORMAT = "[%(asctime)s %(filename)s:%(lineno)s - %(funcName)s()] %(message)s"
@@ -51,7 +52,7 @@ def evaluate(model, queue, criterion, device):
             total_loss += loss.item()
             total_num += sum(feat_lengths)
 
-            distance, length = get_distance(target, y_hat)
+            distance, length = get_distance(target, y_hat, id2char=id2char, eos_id=EOS_TOKEN)
             total_distance += distance
             total_length += length
             total_sentence_num += target.size(0)

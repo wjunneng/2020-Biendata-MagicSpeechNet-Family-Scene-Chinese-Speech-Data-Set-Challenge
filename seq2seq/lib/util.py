@@ -1,6 +1,9 @@
 # -*- coding=utf-8 -*-
 import os
 import sys
+
+os.chdir(sys.path[0])
+
 import json
 import copy
 import string
@@ -17,9 +20,9 @@ from collections import namedtuple
 from torch.utils.data import Dataset
 
 from seq2seq.conf import args
-from seq2seq.lib import spec_augment
 
-os.chdir(sys.path[0])
+from seq2seq.lib import spec_augment_pytorch, melscale_pytorch
+from seq2seq.lib import wavio
 
 
 class Util(object):
@@ -329,6 +332,51 @@ class Util(object):
         sample_submission.to_csv(data_submission_path, index=None)
         print(sample_submission)
 
+    @staticmethod
+    def trim(data, cfg_trim):
+        threshold_attack = cfg_trim["threshold_attack"]
+        threshold_release = cfg_trim["threshold_release"]
+        attack_margin = cfg_trim["attack_margin"]
+        release_margin = cfg_trim["release_margin"]
+
+        data_size = len(data)
+        cut_head = 0
+        cut_tail = data_size
+
+        # Square
+        w = np.power(np.divide(data, np.max(data)), 2)
+
+        # Gaussian kernel
+        sig = 20000
+        time = np.linspace(-40000, 40000)
+        kernel = np.exp(-np.square(time) / 2 / sig / sig)
+
+        # Smooth and normalize
+        w = np.convolve(w, kernel, mode='same')
+        w = np.divide(w, np.max(w))
+
+        # Detect crop sites
+        for sample in range(data_size):
+            sample_num = sample
+            sample_amp = w[sample_num]
+            if sample_amp > threshold_attack:
+                cut_head = np.max([sample_num - attack_margin, 0])
+                break
+
+        for sample in range(data_size):
+            sample_num = data_size - sample - 1
+            sample_amp = w[sample_num]
+            if sample_amp > threshold_release:
+                cut_tail = np.min([sample_num + release_margin, data_size])
+                break
+
+        # print("trimmed audio length = ", cut_tail-cut_head+1)
+
+        data_copy = data[cut_head:cut_tail]
+        del w, time, kernel, data
+
+        return data_copy
+
 
 class DataUtil(object):
     def __init__(self):
@@ -385,9 +433,8 @@ class DataUtil(object):
         for parts in batch:
             feat = parts[1]
             feat_len = feat.shape[0]
-            padded_features.append(np.pad(feat, ((
-                                                     0, max_feat_length - feat_len), (0, 0)), mode='constant',
-                                          constant_values=0.0))
+            padded_features.append(
+                np.pad(feat, ((0, max_feat_length - feat_len), (0, 0)), mode='constant', constant_values=0.0))
 
             if len(batch[0]) == 3:
                 target = parts[2]
@@ -463,35 +510,47 @@ class AudioDataset(Dataset):
             # 计算fbank特征
             feature = ta.compliance.kaldi.fbank(wavform, num_mel_bins=args.input_size)
 
-        # mfcc + time warp
-        elif self.enhance_type == 'time_warp':
-            AudioData = namedtuple('AudioData', ['sig', 'sr'])
-            spectro = spec_augment.tfm_spectro(AudioData(*ta.load(path)), ws=512, hop=256, n_mels=args.input_size,
-                                              to_db_scale=True, f_max=8000, f_min=-80)
+        # time mask + frequency mask
+        elif self.enhance_type == 'freq_mask_time_mask':
+            (rate, width, sig) = wavio.readwav(path)
+            sig = sig.ravel()
+            sig = Util.trim(sig,
+                            {"use": True, "threshold_attack": 0.01, "threshold_release": 0.01, "attack_margin": 5000,
+                             "release_margin": 5000})
+            stft = torch.stft(torch.FloatTensor(sig),
+                              args.N_FFT,
+                              hop_length=int(0.01 * rate),
+                              win_length=int(0.030 * rate),
+                              window=torch.hamming_window(int(0.030 * rate)),
+                              center=False,
+                              normalized=False,
+                              onesided=True)
+            stft = (stft[:, :, 0].pow(2) + stft[:, :, 1].pow(2)).pow(0.5)
 
-            # 注意: F 和 T决定着裁减大小
-            feature = spec_augment.time_warp(spec=spectro, W=2)
-            feature = torch.transpose(feature, 1, 2)
-            feature = feature.reshape(-1, args.input_size)
-
-        # frequency mask
-        elif self.enhance_type == 'frequency_mask':
-            AudioData = namedtuple('AudioData', ['sig', 'sr'])
-            spectro = SpecAugment.tfm_spectro(AudioData(*ta.load(path)), ws=512, hop=256, n_mels=args.input_size,
-                                              to_db_scale=True, f_max=8000, f_min=-80)
-
-            feature = spec_augment.freq_mask(spec=spectro, F=20, num_masks=2)
-            feature = torch.transpose(feature, 1, 2)
-            feature = feature.reshape(-1, args.input_size)
-
-        # mfcc + time mask
-        elif self.enhance_type == 'time_mask':
-            AudioData = namedtuple('AudioData', ['sig', 'sr'])
-            spectro = SpecAugment.tfm_spectro(AudioData(*ta.load(path)), ws=512, hop=256, n_mels=args.input_size,
-                                              to_db_scale=True, f_max=8000, f_min=-80)
-            feature = spec_augment.time_mask(spec=spectro, T=8, num_masks=2)
-            feature = torch.transpose(feature, 1, 2)
-            feature = feature.reshape(-1, args.input_size)
+            if args.use_mel_scale:
+                amag = stft.clone().detach()
+                # reshape spectrogram shape to [batch_size, time, frequency]
+                amag = amag.view(-1, amag.shape[0], amag.shape[1])
+                # melspec with same shape
+                # mel = melscale_pytorch.mel_scale(amag, sample_rate=rate, n_mels=args.N_FFT // 2 + 1)
+                mel = melscale_pytorch.mel_scale(amag, sample_rate=rate, n_mels=args.input_size)
+                if args.use_specaug:
+                    specaug_prob = 1  # augment probability
+                    if np.random.uniform(0, 1) < specaug_prob:
+                        # apply augment
+                        mel = spec_augment_pytorch.spec_augment(mel, time_warping_para=80, frequency_masking_para=54,
+                                                                time_masking_para=40, frequency_mask_num=1,
+                                                                time_mask_num=1)
+                # squeeze back to [frequency, time]
+                feat = mel.view(mel.shape[1], mel.shape[2])
+                feature = feat.transpose(0, 1).clone().detach()
+                del sig, stft, amag, mel
+            else:
+                # use baseline feature
+                amag = stft.numpy()
+                feat = torch.FloatTensor(amag)
+                feature = torch.FloatTensor(feat).transpose(0, 1)
+                del sig, stft, amag
 
         # ################# librosa
         # if args.using_mfcc:

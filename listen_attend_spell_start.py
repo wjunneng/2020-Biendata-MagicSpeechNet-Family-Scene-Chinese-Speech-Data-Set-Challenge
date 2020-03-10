@@ -42,15 +42,16 @@ import torch.optim as optim
 import random
 import torch
 import time
+import math
 
 from listen_attend_spell.model.speller import Speller
 from listen_attend_spell.model.listener import Listener
 from listen_attend_spell.model.listenAttendSpell import ListenAttendSpell
-from listen_attend_spell.package.dataset import split_dataset
-from listen_attend_spell.package.definition import *
+from listen_attend_spell.package.dataset import BaseDataset
+from listen_attend_spell.package import args
 from listen_attend_spell.package.evaluator import evaluate
 from listen_attend_spell.package.hparams import HyperParams
-from listen_attend_spell.package.loader import load_data_list, load_targets, load_pickle, MultiLoader, BaseDataLoader
+from listen_attend_spell.package.loader import load_data_list, MultiLoader, BaseDataLoader
 from listen_attend_spell.package.loss import LabelSmoothingLoss
 from listen_attend_spell.package.trainer import supervised_train
 from listen_attend_spell.package.utils import save_epoch_result
@@ -68,7 +69,8 @@ else:
     import torch as device
 
 if __name__ == '__main__':
-    os.environ["CUDA_LAUNCH_BLOCKING"] = "1"  # if you use Multi-GPU, delete this line
+    # if you use Multi-GPU, delete this line
+    os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
     logger.info("device : %s" % torch.cuda.get_device_name(0))
     logger.info("CUDA is available : %s" % (torch.cuda.is_available()))
     logger.info("CUDA version : %s" % torch.version.cuda)
@@ -83,7 +85,7 @@ if __name__ == '__main__':
     device = torch.device('cuda' if cuda else 'cpu')
 
     listener = Listener(
-        feat_size=128,
+        feat_size=args.input_dim,
         hidden_size=hparams.hidden_size,
         dropout_p=hparams.dropout,
         layer_size=hparams.listener_layer_size,
@@ -92,12 +94,12 @@ if __name__ == '__main__':
         use_pyramidal=hparams.use_pyramidal
     )
     speller = Speller(
-        vocab_size=len(char2id),
+        vocab_size=len(args.char2id),
         max_len=hparams.max_len,
         k=8,
         hidden_size=hparams.hidden_size << (1 if hparams.use_bidirectional else 0),
-        sos_id=SOS_TOKEN,
-        eos_id=EOS_TOKEN,
+        sos_id=args.SOS_TOKEN,
+        eos_id=args.EOS_TOKEN,
         layer_size=hparams.speller_layer_size,
         rnn_cell='gru',
         dropout_p=hparams.dropout,
@@ -110,34 +112,55 @@ if __name__ == '__main__':
 
     optimizer = optim.Adam(model.module.parameters(), lr=hparams.init_lr)
     if hparams.use_label_smooth:
-        criterion = LabelSmoothingLoss(len(char2id), ignore_index=PAD_TOKEN, smoothing=0.1, dim=-1).to(device)
+        criterion = LabelSmoothingLoss(len(args.char2id), ignore_index=args.PAD_TOKEN, smoothing=0.1, dim=-1).to(device)
     else:
-        criterion = nn.CrossEntropyLoss(reduction='sum', ignore_index=PAD_TOKEN).to(device)
+        criterion = nn.CrossEntropyLoss(reduction='sum', ignore_index=args.PAD_TOKEN).to(device)
 
-    audio_paths, label_paths = load_data_list(data_list_path=SAMPLE_LIST_PATH, dataset_path=SAMPLE_DATASET_PATH)
+    vocab_dict = {}
+    with open(args.vocab_path, mode='r', encoding='utf-8') as file:
+        for line in file:
+            vocab_dict[line.split(' ')[0]] = int(line.split(' ')[1].strip('\n'))
 
-    if hparams.use_pickle:
-        target_dict = load_pickle(TARGET_DICT_PATH, "load all target_dict using pickle complete !!")
-    else:
-        target_dict = load_targets(label_paths)
+    train_utt_ids, train_audio_paths, train_label_texts = load_data_list(wav_path=args.data_train_wav_path,
+                                                                         text_path=args.data_train_text_path,
+                                                                         vocab_dict=vocab_dict)
 
-    total_time_step, train_dataset_list, valid_dataset = split_dataset(
-        hparams=hparams,
-        audio_paths=audio_paths,
-        label_paths=label_paths,
-        valid_ratio=0.015,
-        target_dict=target_dict,
+    dev_utt_ids, dev_audio_paths, dev_label_texts = load_data_list(wav_path=args.data_dev_wav_path,
+                                                                   text_path=args.data_dev_text_path,
+                                                                   vocab_dict=vocab_dict)
+    # seperating the train dataset by the number of workers
+    train_dataset_list = []
+    for idx in range(hparams.worker_num):
+        train_dataset_list.append(
+            BaseDataset(audio_paths=train_audio_paths,
+                        label_paths=train_label_texts,
+                        input_reverse=hparams.input_reverse,
+                        use_augment=hparams.use_augment,
+                        batch_size=hparams.batch_size,
+                        augment_ratio=hparams.augment_ratio,
+                        pack_by_length=False)
+        )
+
+    valid_dataset = BaseDataset(
+        audio_paths=dev_audio_paths,
+        label_paths=dev_label_texts,
+        batch_size=hparams.batch_size,
+        input_reverse=hparams.input_reverse,
+        use_augment=False,
+        pack_by_length=False
     )
+
     logger.info('start')
     train_begin = time.time()
 
+    total_time_step = math.ceil((len(train_audio_paths)) / hparams.batch_size)
     for epoch in range(hparams.max_epochs):
         train_queue = queue.Queue(hparams.worker_num << 1)
         for train_dataset in train_dataset_list:
             train_dataset.shuffle()
         train_loader = MultiLoader(train_dataset_list, train_queue, hparams.batch_size, hparams.worker_num)
         train_loader.start()
-        train_loss, train_cer = supervised_train(
+        train_loss = supervised_train(
             model=model,
             total_time_step=total_time_step,
             hparams=hparams,
@@ -148,12 +171,11 @@ if __name__ == '__main__':
             device=device,
             train_begin=train_begin,
             worker_num=hparams.worker_num,
-            print_time_step=10,
+            print_time_step=100,
             teacher_forcing_ratio=hparams.teacher_forcing
         )
-        torch.save(model, "model.pt")
-        torch.save(model, "./data/weight_file/epoch%s.pt" % str(epoch))
-        logger.info('Epoch %d (Training) Loss %0.4f CER %0.4f' % (epoch, train_loss, train_cer))
+        torch.save(model, os.path.join(args.data_model_dir, "epoch%s.pt" % str(epoch)))
+        logger.info('Epoch %d (Training) Loss %0.4f' % (epoch, train_loss))
         train_loader.join()
         valid_queue = queue.Queue(hparams.worker_num << 1)
         valid_loader = BaseDataLoader(valid_dataset, valid_queue, hparams.batch_size, 0)
@@ -164,6 +186,6 @@ if __name__ == '__main__':
 
         valid_loader.join()
 
-        save_epoch_result(train_result=[train_dict, train_loss, train_cer],
-                          valid_result=[valid_dict, valid_loss, valid_cer])
+        save_epoch_result(train_result=[args.train_dict, train_loss],
+                          valid_result=[args.valid_dict, valid_loss, valid_cer])
         logger.info('Epoch %d Training result saved as a csv file complete !!' % epoch)

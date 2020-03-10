@@ -73,16 +73,8 @@ class Run(object):
             train_wav_list = [self.args.data_train_wav_path, self.args.data_dev_wav_path]
             train_text_list = [self.args.data_train_text_path, self.args.data_dev_text_path]
 
-            enhance_type = '0'
-            if str(epoch)[-1] == '9':
-                enhance_type = '9'
-            elif str(epoch)[-1] == '8':
-                enhance_type = '8'
-            elif str(epoch)[-1] == '7':
-                enhance_type = '7'
-
             dataset = AudioDataset(train_wav_list, train_text_list, unit2idx=unit2idx,
-                                   enhance_type=self.args.enhance[enhance_type])
+                                   enhance_type=self.args.enhance[str(epoch)[-1]])
             dataloader = DataLoader(dataset, batch_size=self.args.batch_size, shuffle=True,
                                     num_workers=2, pin_memory=False,
                                     collate_fn=DataUtil.collate_fn)
@@ -142,7 +134,7 @@ class Run(object):
                 idx2unit[int(idx)] = unit
 
         wav_list = [self.args.data_test_wav_path]
-        test_dataset = AudioDataset(wav_list, enhance_type='fbank')
+        test_dataset = AudioDataset(wav_list, enhance_type='freq_mask_time_mask')
         test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=2,
                                                       pin_memory=False, collate_fn=DataUtil.collate_fn)
 
@@ -170,7 +162,7 @@ class Run(object):
 
 if __name__ == '__main__':
     start = time.clock()
-    # Run().train()
+    Run().train()
     current_time = time.clock()
     print('train using time: {}'.format(current_time - start))
     Run().predict()
