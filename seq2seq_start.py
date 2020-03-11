@@ -46,7 +46,7 @@ class Run(object):
                             share_embedding=self.args.share_embedding)
 
         # 按照原本的模型接下来运行
-        # checkpoints = torch.load(os.path.join(self.args.data_model_dir, 'model.epoch.*.pt'))
+        # checkpoints = torch.load(os.path.join(self.args.data_model_dir, 'model.epoch.24.pt'))
         # model.load_state_dict(checkpoints)
 
         if torch.cuda.is_available():
@@ -139,7 +139,7 @@ class Run(object):
                                                       pin_memory=False, collate_fn=DataUtil.collate_fn)
 
         # checkpoints = torch.load('./model/model.pt', map_location=lambda storage, loc: storage)
-        checkpoints = torch.load(os.path.join(self.args.data_model_dir, 'model.epoch.24.pt'))
+        checkpoints = torch.load(os.path.join(self.args.data_model_dir, 'model.epoch.1.pt'))
         eval_model.load_state_dict(checkpoints)
 
         recognizer = Recognizer(eval_model, unit2char=idx2unit)

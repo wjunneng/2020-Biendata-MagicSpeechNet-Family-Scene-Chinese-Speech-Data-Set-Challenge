@@ -66,7 +66,7 @@ data_pre_submission_path = os.path.join(data_dir, 'pre_submission.csv')
 vocab_path = os.path.join(data_dir, 'vocab.txt')
 vocab = {'<PAD>': 0, '<BOS>': 1, '<EOS>': 2, '<UNK>': 3}
 # 需要时刻注意是否更新
-vocab_size = 3864
+vocab_size = 39731
 
 seed = 42
 
@@ -83,16 +83,28 @@ seed = 42
 #            '9': 'freq_mask_time_mask',
 #            }
 
-enhance = {'0': 'freq_mask_time_mask',
-           '1': 'freq_mask_time_mask',
-           '2': 'freq_mask_time_mask',
-           '3': 'freq_mask_time_mask',
-           '4': 'freq_mask_time_mask',
-           '5': 'freq_mask_time_mask',
-           '6': 'freq_mask_time_mask',
-           '7': 'freq_mask_time_mask',
-           '8': 'freq_mask_time_mask',
-           '9': 'freq_mask_time_mask',
+# enhance = {'0': 'freq_mask_time_mask',
+#            '1': 'freq_mask_time_mask',
+#            '2': 'freq_mask_time_mask',
+#            '3': 'freq_mask_time_mask',
+#            '4': 'freq_mask_time_mask',
+#            '5': 'freq_mask_time_mask',
+#            '6': 'freq_mask_time_mask',
+#            '7': 'freq_mask_time_mask',
+#            '8': 'freq_mask_time_mask',
+#            '9': 'freq_mask_time_mask',
+#            }
+
+enhance = {'0': 'fbank',
+           '1': 'fbank',
+           '2': 'fbank',
+           '3': 'fbank',
+           '4': 'fbank',
+           '5': 'fbank',
+           '6': 'fbank',
+           '7': 'fbank',
+           '8': 'fbank',
+           '9': 'fbank',
            }
 
 # -* model arguments *-
@@ -119,8 +131,9 @@ accu_grads_steps = 8
 
 # 输入特征维度
 input_size = 128
-# 指定批大小 [batch:16->Global Step:1280]
-batch_size = 8
-N_FFT = 512
-use_mel_scale = True
-use_specaug = False
+batch_size = 16
+# # 指定批大小 [batch:16->Global Step:1280]
+
+# N_FFT = 512
+# use_mel_scale = True
+# use_specaug = False

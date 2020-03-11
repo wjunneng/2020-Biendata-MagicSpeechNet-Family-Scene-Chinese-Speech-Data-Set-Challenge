@@ -16,7 +16,6 @@ import torchaudio as ta
 from torch import nn
 from skimage.restoration import (denoise_wavelet, estimate_sigma)
 from zhon import hanzi
-from collections import namedtuple
 from torch.utils.data import Dataset
 
 from seq2seq.conf import args
@@ -142,7 +141,9 @@ class Util(object):
                 utt_info = utt_list[i]
                 session_id = utt_info['session_id']
                 uttid = utt_info['uttid']
-                if 'words' in utt_info: continue  # 如果句子已经标注，则跳过
+                # 如果句子已经标注，则跳过
+                if 'words' in utt_info:
+                    continue
                 # 句子切分
                 start_time = Util.time2sec(utt_info['start_time'])
                 end_time = Util.time2sec(utt_info['end_time'])
@@ -166,15 +167,20 @@ class Util(object):
         :param seq:
         :return:
         """
+        import jieba
+
         new_seq = []
-        for c in seq:
+        for c in list(jieba.cut(seq, cut_all=False)):
             if c == '+':
-                new_seq.append(c)  # 文档中有加号，所以单独处理，避免删除
+                # 文档中有加号，所以单独处理，避免删除
+                new_seq.append(c)
             elif c in string.punctuation or c in hanzi.punctuation:
-                continue  # 删除全部的半角标点和全角标点
+                # 删除全部的半角标点和全角标点
+                continue
             else:
                 if c.encode('UTF-8').isalpha():
-                    c = c.lower()  # 大写字母转小写
+                    # 大写字母转小写
+                    c = c.lower()
                 new_seq.append(c)
         return ' '.join(new_seq)
 
@@ -611,17 +617,18 @@ class AudioDataset(Dataset):
 
 
 if __name__ == '__main__':
+    pass
     # # 处理训练集和验证集
     # Util.deal_train_dev()
-    #
+
     # # 处理测试集
     # Util.deal_test()
-    # #
+
     # # 标准化训练和验证集
     # Util.normal_train_dev()
-    #
+
     # # 词表生成
     # DataUtil().generate_vocab_table()
 
     # 后处理
-    Util.preprocessing_result()
+    # Util.preprocessing_result()
