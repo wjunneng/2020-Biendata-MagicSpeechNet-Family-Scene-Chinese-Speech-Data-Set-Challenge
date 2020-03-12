@@ -23,6 +23,10 @@ from seq2seq.conf import args
 from seq2seq.lib import spec_augment_pytorch, melscale_pytorch
 from seq2seq.lib import wavio
 
+import thulac
+
+thu = thulac.thulac()
+
 
 class Util(object):
     def __init__(self):
@@ -125,14 +129,20 @@ class Util(object):
         处理测试集
         :return:
         """
-        if os.path.exists(args.data_test_wav_dir) is False:
+        if os.path.exists(args.data_test_wav_dir) is False and args.test_type == 'IOS':
             os.makedirs(args.data_test_wav_dir)
+
+        if os.path.exists(args.data_test_wav_android_dir) is False and args.test_type == 'Android':
+            os.makedirs(args.data_test_wav_android_dir)
+
+        if os.path.exists(args.data_test_wav_recorder_dir) is False and args.test_type == 'Recorder':
+            os.makedirs(args.data_test_wav_recorder_dir)
 
         seg_wav_list = []
         sub_audio_dir = os.path.join(args.audio_dir, 'test')
         for wav in os.listdir(sub_audio_dir):
             # 跳过隐藏文文件和IOS的音频文件
-            if wav[0] == '.' or 'IOS' not in wav:
+            if wav[0] == '.' or args.test_type not in wav:
                 continue  # 跳过隐藏文件和非IOS的音频文件
 
             jf = '_'.join(wav.split('_')[:-1]) + '.json'
@@ -150,13 +160,30 @@ class Util(object):
 
                 tgt_id = uttid + '.wav'
                 src_wav = os.path.join(sub_audio_dir, wav)
-                tgt_wav = os.path.join(args.data_test_wav_dir, tgt_id)
+                if args.test_type == 'IOS':
+                    tgt_wav = os.path.join(args.data_test_wav_dir, tgt_id)
+                elif args.test_type == 'Android':
+                    tgt_wav = os.path.join(args.data_test_wav_android_dir, tgt_id)
+                else:
+                    tgt_wav = os.path.join(args.data_test_wav_recorder_dir, tgt_id)
+
                 Util.segment_wav(src_wav=src_wav, tgt_wav=tgt_wav, start_time=start_time, end_time=end_time)
                 seg_wav_list.append((uttid, tgt_wav))
 
-        with open(args.data_test_wav_path, 'w') as ww:
-            for uttid, wavdir in seg_wav_list:
-                ww.write(uttid + ' ' + wavdir + '\n')
+        if args.test_type == 'IOS':
+            with open(args.data_test_wav_path, 'w') as ww:
+                for uttid, wavdir in seg_wav_list:
+                    ww.write(uttid + ' ' + wavdir + '\n')
+
+        elif args.test_type == 'Android':
+            with open(args.data_test_wav_android_path, 'w') as ww:
+                for uttid, wavdir in seg_wav_list:
+                    ww.write(uttid + ' ' + wavdir + '\n')
+
+        else:
+            with open(args.data_test_wav_recorder_path, 'w') as ww:
+                for uttid, wavdir in seg_wav_list:
+                    ww.write(uttid + ' ' + wavdir + '\n')
 
         print('prepare test dataset done!')
 
@@ -167,10 +194,10 @@ class Util(object):
         :param seq:
         :return:
         """
-        import jieba
-
+        seq = thu.cut(seq)
         new_seq = []
-        for c in list(jieba.cut(seq, cut_all=False)):
+        for c in seq:
+            c = c[0]
             if c == '+':
                 # 文档中有加号，所以单独处理，避免删除
                 new_seq.append(c)
@@ -321,7 +348,13 @@ class Util(object):
 
     @staticmethod
     def generate_result():
-        data_result_path = args.data_reault_path
+        if args.test_type == 'IOS':
+            data_result_path = args.data_result_path
+        elif args.test_type == 'Android':
+            data_result_path = args.data_result_android_path
+        else:
+            data_result_path = args.data_result_recorder_path
+
         sample_submission_path = args.sample_submission_path
         data_submission_path = args.data_submission_path
 
@@ -427,7 +460,7 @@ class DataUtil(object):
 
         vocab_list = sorted(vocab_dict.items(), key=lambda x: x[1], reverse=True)
         vocab = copy.deepcopy(args.vocab)
-        for i in range(len(vocab_list)):
+        for i in range(min(len(vocab_list), args.vocab_size - 4)):
             c = vocab_list[i][0]
             vocab[c] = i + 4
 
@@ -621,13 +654,16 @@ if __name__ == '__main__':
     # # 处理训练集和验证集
     # Util.deal_train_dev()
 
-    # # 处理测试集
+    # print('deal train dev end !')
+    # # # 处理测试集
     # Util.deal_test()
 
-    # # 标准化训练和验证集
+    # print('deal test end !')
+    # # # 标准化训练和验证集
     # Util.normal_train_dev()
 
-    # # 词表生成
+    # print('generate vocab end !')
+    # # # 词表生成
     # DataUtil().generate_vocab_table()
 
     # 后处理

@@ -373,7 +373,7 @@ class Transformer(nn.Module):
 
 # 定义解码识别模块
 class Recognizer():
-    def __init__(self, model, unit2char=None, beam_width=5, max_len=100):
+    def __init__(self, model, unit2char=None, beam_width=8, max_len=36):
 
         self.model = model
         self.model.eval()

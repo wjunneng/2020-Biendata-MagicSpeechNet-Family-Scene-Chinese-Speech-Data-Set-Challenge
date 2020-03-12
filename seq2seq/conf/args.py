@@ -47,10 +47,23 @@ data_dev_text_path = os.path.join(data_dev_dir, 'text.txt')
 # -* test *-
 # data test dir
 data_test_dir = os.path.join(data_dir, 'test')
+
+test_type = 'Android'
+
 # data test wav dir
 data_test_wav_dir = os.path.join(data_test_dir, 'wav')
 # data test wav path
 data_test_wav_path = os.path.join(data_test_dir, 'wav.scp')
+
+# data test wav android dir
+data_test_wav_android_dir = os.path.join(data_test_dir, 'wav_android')
+# data test wav android path
+data_test_wav_android_path = os.path.join(data_test_dir, 'wav_android.scp')
+
+# data test wav recorder dir
+data_test_wav_recorder_dir = os.path.join(data_test_dir, 'wav_recorder')
+# data test wav recorder path
+data_test_wav_recorder_path = os.path.join(data_test_dir, 'wav_recorder.scp')
 
 # -* model *-
 # data model dir
@@ -58,7 +71,10 @@ data_model_dir = os.path.join(data_dir, 'model')
 
 # -* result *-
 # data result path
-data_reault_path = os.path.join(data_dir, 'result.csv')
+data_result_path = os.path.join(data_dir, 'result.csv')
+data_result_android_path = os.path.join(data_dir, 'result_android.csv')
+data_result_recorder_path = os.path.join(data_dir, 'result_recorder.csv')
+
 sample_submission_path = os.path.join(magicdata_dir, 'sample_submission.csv')
 data_submission_path = os.path.join(data_dir, 'submission.csv')
 data_pre_submission_path = os.path.join(data_dir, 'pre_submission.csv')
@@ -66,7 +82,7 @@ data_pre_submission_path = os.path.join(data_dir, 'pre_submission.csv')
 vocab_path = os.path.join(data_dir, 'vocab.txt')
 vocab = {'<PAD>': 0, '<BOS>': 1, '<EOS>': 2, '<UNK>': 3}
 # 需要时刻注意是否更新
-vocab_size = 39731
+vocab_size = 34661
 
 seed = 42
 
@@ -130,7 +146,7 @@ lr_factor = 1.0
 accu_grads_steps = 8
 
 # 输入特征维度
-input_size = 128
+input_size = 64
 batch_size = 16
 # # 指定批大小 [batch:16->Global Step:1280]
 

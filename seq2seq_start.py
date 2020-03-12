@@ -112,6 +112,16 @@ class Run(object):
         print('Done!')
 
     def predict(self):
+        if args.test_type == 'IOS':
+            data_reault_path = args.data_result_path
+            data_test_wav_path = args.data_test_wav_path
+        elif args.test_type == 'Android':
+            data_reault_path = args.data_result_android_path
+            data_test_wav_path = args.data_test_wav_android_path
+        else:
+            data_reault_path = args.data_result_recorder_path
+            data_test_wav_path = args.data_test_wav_recorder_path
+
         # 定义评估模型
         eval_model = Transformer(input_size=self.args.input_size,
                                  vocab_size=self.args.vocab_size,
@@ -133,18 +143,18 @@ class Run(object):
                 unit, idx = line.strip().split()
                 idx2unit[int(idx)] = unit
 
-        wav_list = [self.args.data_test_wav_path]
-        test_dataset = AudioDataset(wav_list, enhance_type='freq_mask_time_mask')
+        wav_list = [data_test_wav_path]
+        test_dataset = AudioDataset(wav_list, enhance_type='fbank')
         test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=2,
                                                       pin_memory=False, collate_fn=DataUtil.collate_fn)
 
         # checkpoints = torch.load('./model/model.pt', map_location=lambda storage, loc: storage)
-        checkpoints = torch.load(os.path.join(self.args.data_model_dir, 'model.epoch.1.pt'))
+        checkpoints = torch.load(os.path.join(self.args.data_model_dir, 'model.epoch.21.pt'))
         eval_model.load_state_dict(checkpoints)
 
         recognizer = Recognizer(eval_model, unit2char=idx2unit)
 
-        csv_writer = open(self.args.data_reault_path, 'w', encoding='utf-8')
+        csv_writer = open(data_reault_path, 'w', encoding='utf-8')
         csv_writer.write('id,words\n')
         print('Begin to decode test set!')
         total_num = len(test_dataloader)
@@ -162,10 +172,10 @@ class Run(object):
 
 if __name__ == '__main__':
     start = time.clock()
-    Run().train()
+    # Run().train()
     current_time = time.clock()
     # print('train using time: {}'.format(current_time - start))
-    # Run().predict()
+    Run().predict()
     print('predict using time: {}'.format(time.clock() - current_time))
     # 生成提交结果
-    # Util.generate_result()
+    Util.generate_result()
